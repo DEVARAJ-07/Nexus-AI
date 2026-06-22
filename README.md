@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OutPost CI/CD Platform 🚀 [Beta Version]
 
-## Getting Started
+> [!IMPORTANT]
+> This repository contains the **Beta Version** of the OutPost CI/CD Platform under active development. Some advanced runner profiles and integrations are in active testing.
 
-First, run the development server:
+OutPost is a high-performance, developer-first, and highly concurrent CI/CD platform designed to automate builds, testing suites, security audits, and multi-cloud deployments with ease. Inspired by elegant, brutalist design patterns, OutPost delivers high visibility, lightning-fast logs, and direct terminal-level control.
 
+---
+
+## 🛠️ Getting Started
+
+### 1. Installation & Setup
+Make sure you have [Node.js](https://nodejs.org) installed, then install project dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Run the Development Server
+Launch the server locally to explore the beta pipeline dashboard:
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) with your browser to view the interface.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### 3. Production Build
+To verify production bundle compilation and verify compliance:
+```bash
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🏗️ Architecture
 
-To learn more about Next.js, take a look at the following resources:
+```
+[ Developer CLI / Webhook ]
+           │
+           ▼
+   [ Fast Queue Server ] ──(authenticates)──► [ Postgres Storage ]
+           │
+           ▼
+[ LangGraph Worker Threads ] ──(spawns)────► [ Parallel Job Runners ]
+           │                                          │
+           ▼                                          ▼
+   [ build_and_compile ]                      [ security_probe ]
+   [ test_suite_runner ]                      [ vercel_deployer ]
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🧪 Current Features (Beta)
+- **Visual ASCII Architecture Flow**: Explore visual diagrams of your pipelines directly from the web interface.
+- **Simulated Real-Time Log Buffering**: Responsive terminal logs showing standard build operations step-by-step.
+- **Run Logs & History**: Complete records of previous runs, execution times, commit authors, and system metrics.
+- **Secure Webhooks & Settings**: Configuration space for environment parameters and computed runner options.
