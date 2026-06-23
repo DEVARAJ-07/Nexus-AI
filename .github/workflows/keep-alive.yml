@@ -1,0 +1,26 @@
+name: Outpost Keep-Alive Daemon
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every 3 days
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
+jobs:
+  ping-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send keep-alive probe to Render and Supabase
+        run: |
+          # Replace this URL with your actual hosted Render API URL
+          API_URL="https://outpost-backend-api.onrender.com/api/settings"
+          
+          echo "Sending ping to $API_URL..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL")
+          
+          echo "Response code received: $RESPONSE"
+          if [ "$RESPONSE" -eq 200 ] || [ "$RESPONSE" -eq 301 ] || [ "$RESPONSE" -eq 302 ]; then
+            echo "Keep-alive ping successful. Services are warm!"
+          else
+            echo "WARNING: Received status code $RESPONSE. Check if server is online."
+          fi
