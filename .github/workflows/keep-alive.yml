@@ -1,4 +1,4 @@
-name: Outpost Keep-Alive Daemon
+name: Nexus AI Keep-Alive Daemon
 
 on:
   schedule:
@@ -13,7 +13,7 @@ jobs:
       - name: Send keep-alive probe to Render and Supabase
         run: |
           # Replace this URL with your actual hosted Render API URL
-          API_URL="https://outpost-backend-api.onrender.com/api/settings"
+          API_URL="https://nexus-ai-backend-api.onrender.com/api/settings"
           
           echo "Sending ping to $API_URL..."
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL")

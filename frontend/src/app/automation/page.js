@@ -5,11 +5,13 @@ import { Plus, ToggleLeft, ToggleRight, Info } from "lucide-react";
 
 export default function Automation() {
   const [workflows, setWorkflows] = useState([
-    { id: "wf-1", name: "Welcome New Lead Sequence", trigger: "NEW_CONTACT", action: "SEND_EMAIL", status: true },
-    { id: "wf-2", name: "Slack Alert for Hot Leads", trigger: "STAGE_CHANGED", action: "NOTIFY_SLACK", status: false }
+    { id: "wf-1", name: "Production Auto-Deploy on Push", trigger: "GIT_PUSH", action: "TRIGGER_DEPLOY", status: true },
+    { id: "wf-2", name: "AI Log Repair on Build Failure", trigger: "PIPELINE_FAILED", action: "AI_LOG_DIAGNOSTICS", status: true },
+    { id: "wf-3", name: "Post Slack Alert on PR Open", trigger: "PR_OPENED", action: "POST_SLACK_ALERT", status: false }
   ]);
-  const [selectedTrigger, setSelectedTrigger] = useState("NEW_CONTACT");
-  const [selectedAction, setSelectedAction] = useState("SEND_EMAIL");
+  const [selectedTrigger, setSelectedTrigger] = useState("GIT_PUSH");
+  const [selectedAction, setSelectedAction] = useState("TRIGGER_DEPLOY");
+  const [newWorkflowName, setNewWorkflowName] = useState("");
 
   const toggleStatus = (id) => {
     setWorkflows((prev) =>
@@ -19,23 +21,25 @@ export default function Automation() {
 
   const handleCreate = (e) => {
     e.preventDefault();
+    const name = newWorkflowName.trim() || `DevOps Sequence ${workflows.length + 1}`;
     const newWf = {
       id: `wf-${Date.now()}`,
-      name: `Automation Sequence ${workflows.length + 1}`,
+      name,
       trigger: selectedTrigger,
       action: selectedAction,
       status: false
     };
     setWorkflows((prev) => [...prev, newWf]);
+    setNewWorkflowName("");
   };
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
         <div>
-          <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>Automation Forge</h3>
+          <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>DevOps Automation Forge</h3>
           <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-            Visual trigger-action workflow canvas. Connect events to instant tasks across modules.
+            Visual trigger-action builder linking Git hooks to tests, AI diagnostics, and deployment pipelines.
           </p>
         </div>
       </div>
@@ -44,12 +48,12 @@ export default function Automation() {
         {/* Drag and Drop Canvas Simulation */}
         <div>
           <h4 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", marginBottom: "1rem" }}>
-            Visual Builder Canvas
+            Visual Pipeline Designer
           </h4>
           <div className="canvas-area">
             {/* Trigger node */}
             <div className="canvas-node" style={{ top: "10%", left: "10%", borderStyle: "dashed" }}>
-              ⚡ TRIGGER: {selectedTrigger}
+              ⚡ EVENT: {selectedTrigger}
             </div>
             
             <div style={{ fontSize: "1.5rem", color: "var(--color-taupe)" }}>═══►</div>
@@ -70,7 +74,7 @@ export default function Automation() {
               alignItems: "center",
               gap: "0.25rem"
             }}>
-              <Info size={12} /> Canvas displays the trigger-action mapping. Commit changes below.
+              <Info size={12} /> Visual connection shows trigger mapping. Commit the sequence below.
             </div>
           </div>
         </div>
@@ -78,40 +82,53 @@ export default function Automation() {
         {/* Configurations Sidepanel */}
         <div style={{ border: "1px solid var(--border-color)", padding: "1.5rem", backgroundColor: "var(--color-off-white)", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <h4 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", borderBottom: "1px solid var(--color-taupe)", paddingBottom: "0.5rem" }}>
-            Node Configurator
+            Automation Configurator
           </h4>
 
           <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>TRIGGER EVENT</label>
+              <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>TRIGGER HOOK</label>
               <select
                 value={selectedTrigger}
                 onChange={(e) => setSelectedTrigger(e.target.value)}
                 className="brutalist-input"
                 style={{ height: "36px" }}
               >
-                <option value="NEW_CONTACT">New Lead Added</option>
-                <option value="STAGE_CHANGED">CRM Stage Changed</option>
-                <option value="CONTENT_PUBLISHED">Content Published</option>
+                <option value="GIT_PUSH">Git Commit Pushed</option>
+                <option value="PR_OPENED">Pull Request Opened</option>
+                <option value="PIPELINE_FAILED">CI Build Failed</option>
+                <option value="RELEASE_CREATED">Release Tag Created</option>
               </select>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>ACTION TASK</label>
+              <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>ACTION TARGET</label>
               <select
                 value={selectedAction}
                 onChange={(e) => setSelectedAction(e.target.value)}
                 className="brutalist-input"
                 style={{ height: "36px" }}
               >
-                <option value="SEND_EMAIL">Send Email via Resend</option>
-                <option value="NOTIFY_SLACK">Dispatch Slack Alert</option>
-                <option value="CREATE_CONTENT">Generate Content Studio draft</option>
+                <option value="TRIGGER_DEPLOY">Trigger Deployment (Vercel / Render)</option>
+                <option value="RUN_TEST_SUITE">Execute Vitest & Integration Suites</option>
+                <option value="AI_LOG_DIAGNOSTICS">Run AI Log Diagnostics Scan</option>
+                <option value="POST_SLACK_ALERT">Dispatch Slack/Discord Alert</option>
               </select>
             </div>
 
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>SEQUENCE NAME</label>
+              <input
+                type="text"
+                value={newWorkflowName}
+                onChange={(e) => setNewWorkflowName(e.target.value)}
+                placeholder="e.g. Slack on Test Failures"
+                className="brutalist-input"
+              />
+            </div>
+
             <button type="submit" className="brutalist-button" style={{ display: "flex", gap: "0.25rem" }}>
-              <Plus size={14} /> Add Workflow
+              <Plus size={14} /> Add DevOps Sequence
             </button>
           </form>
         </div>
@@ -119,15 +136,15 @@ export default function Automation() {
 
       {/* Active Workflows list */}
       <h4 style={{ fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--color-taupe)", marginTop: "3rem", marginBottom: "1rem" }}>
-        Active Workflow Triggers
+        Active Automation Rules
       </h4>
 
       <table className="spec-table">
         <thead>
           <tr className="spec-header-row">
-            <th className="spec-cell spec-cell-header">Workflow Name</th>
+            <th className="spec-cell spec-cell-header">Automation Sequence</th>
             <th className="spec-cell spec-cell-header">Trigger Event</th>
-            <th className="spec-cell spec-cell-header">Action Task</th>
+            <th className="spec-cell spec-cell-header">Action Target</th>
             <th className="spec-cell spec-cell-header" style={{ textAlign: "center" }}>Status</th>
           </tr>
         </thead>

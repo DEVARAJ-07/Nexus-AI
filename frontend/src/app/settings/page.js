@@ -5,11 +5,11 @@ import { CreditCard, Users, Trash2 } from "lucide-react";
 
 export default function Settings() {
   const [profileName, setProfileName] = useState("John Doe");
-  const [profileEmail, setProfileEmail] = useState("john@outpost.ai");
-  const [orgName, setOrgName] = useState("Outpost Headquarters");
+  const [profileEmail, setProfileEmail] = useState("john@nexus-ci.com");
+  const [orgName, setOrgName] = useState("Nexus Headquarters");
   
   const [team, setTeam] = useState([
-    { id: "u-1", name: "John Doe", email: "john@outpost.ai", role: "ADMIN" },
+    { id: "u-1", name: "John Doe", email: "john@nexus-ci.com", role: "ADMIN" },
     { id: "u-2", name: "Sarah Connor", email: "sarah@skynet.com", role: "MEMBER" }
   ]);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -77,13 +77,13 @@ export default function Settings() {
         {/* Subscription Plan & Billing */}
         <div>
           <h3 style={{ fontFamily: "monospace", fontSize: "0.9rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}>
-            Billing & Usage Limits
+            Billing & Resource Utilization
           </h3>
           <div style={{ border: "1px solid var(--border-color)", padding: "1.25rem", backgroundColor: "var(--color-warm-grey)", display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "0.85rem", fontWeight: 800 }}>PRO TIER STATUS</span>
+              <span style={{ fontSize: "0.85rem", fontWeight: 800 }}>ENTERPRISE TIER STATUS</span>
               <span style={{ fontSize: "0.7rem", fontFamily: "monospace", padding: "0.1rem 0.4rem", border: "1px solid var(--border-color)", backgroundColor: "var(--color-off-white)" }}>
-                $29 / MONTH
+                $199 / MONTH
               </span>
             </div>
             
@@ -91,17 +91,17 @@ export default function Settings() {
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>SUPABASE POSTGRES DB STORAGE</span>
-                  <span>45MB / 500MB</span>
+                  <span>45MB / 5GB</span>
                 </div>
                 <div style={{ height: "4px", width: "100%", backgroundColor: "var(--color-slate)" }}>
-                  <div style={{ height: "100%", width: "9%", backgroundColor: "var(--text-primary)" }} />
+                  <div style={{ height: "100%", width: "1%", backgroundColor: "var(--text-primary)" }} />
                 </div>
               </div>
 
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>PINECONE VECTOR EMBEDDINGS</span>
-                  <span>4.2K / 100K VECTORS</span>
+                  <span>PINECONE LOG DIAGNOSTICS DB</span>
+                  <span>4.2K / 100K VECTOR RUNS</span>
                 </div>
                 <div style={{ height: "4px", width: "100%", backgroundColor: "var(--color-slate)" }}>
                   <div style={{ height: "100%", width: "4%", backgroundColor: "var(--text-primary)" }} />
@@ -110,11 +110,11 @@ export default function Settings() {
 
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>RESEND MONTHLY EMAILS</span>
-                  <span>410 / 3000 EMAILS</span>
+                  <span>PIPELINE AUTOMATION RUNS</span>
+                  <span>410 / 5000 RUNS</span>
                 </div>
                 <div style={{ height: "4px", width: "100%", backgroundColor: "var(--color-slate)" }}>
-                  <div style={{ height: "100%", width: "13%", backgroundColor: "var(--text-primary)" }} />
+                  <div style={{ height: "100%", width: "8%", backgroundColor: "var(--text-primary)" }} />
                 </div>
               </div>
             </div>

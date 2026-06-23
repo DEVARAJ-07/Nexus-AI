@@ -5,14 +5,14 @@ import { Plus, Key, Trash2, CheckCircle } from "lucide-react";
 
 export default function Integrations() {
   const [keys, setKeys] = useState([
-    { id: "key-1", name: "Outpost CLI Token", hash: "op_live_3892fbc••••••••••••", permissions: "Admin" }
+    { id: "key-1", name: "Nexus CLI Token", hash: "nx_live_3892fbc••••••••••••", permissions: "Admin" }
   ]);
   const [keyName, setKeyName] = useState("");
   const [webhooks, setWebhooks] = useState([
-    { id: "wh-1", type: "outbound", url: "https://api.zapier.com/hooks/outpost", event: "lead.created" }
+    { id: "wh-1", type: "outbound", url: "https://api.zapier.com/hooks/nexus", event: "build.failed" }
   ]);
   const [webhookUrl, setWebhookUrl] = useState("");
-  const [webhookEvent, setWebhookEvent] = useState("lead.created");
+  const [webhookEvent, setWebhookEvent] = useState("build.failed");
 
   const handleGenerateKey = (e) => {
     e.preventDefault();
@@ -20,7 +20,7 @@ export default function Integrations() {
     const newKey = {
       id: `key-${Date.now()}`,
       name: keyName,
-      hash: `op_live_${Math.random().toString(36).substring(2, 10)}••••••••`,
+      hash: `nx_live_${Math.random().toString(36).substring(2, 10)}••••••••`,
       permissions: "Write"
     };
     setKeys((prev) => [...prev, newKey]);
@@ -49,10 +49,10 @@ export default function Integrations() {
   };
 
   const marketplace = [
-    { name: "Slack", desc: "Push AI content drafts and CRM lead alerts directly to team channels.", connected: true },
-    { name: "Notion", desc: "Synchronize documents and knowledge base articles semantically.", connected: true },
-    { name: "HubSpot", desc: "Bi-directional sync of contacts and lead scoring timeline.", connected: false },
-    { name: "Google Drive", desc: "Index documents folder automatically for Q&A embeddings.", connected: false }
+    { name: "GitHub", desc: "Access repository commits and trigger pipeline builds from push hooks.", connected: true },
+    { name: "Vercel", desc: "Automate website deployments and canary releases instantly.", connected: true },
+    { name: "Render", desc: "Push docker images and run node api server instances automatically.", connected: true },
+    { name: "Slack", desc: "Broadcast build failures, diagnostic outputs, and PR notifications.", connected: false }
   ];
 
   return (
@@ -62,7 +62,7 @@ export default function Integrations() {
         {/* Marketplace */}
         <div>
           <h3 style={{ fontFamily: "monospace", fontSize: "0.9rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}>
-            Integration Marketplace
+            DevOps Integrations
           </h3>
           <div className="integration-grid">
             {marketplace.map((m) => (
@@ -91,7 +91,7 @@ export default function Integrations() {
         {/* Webhooks */}
         <div>
           <h3 style={{ fontFamily: "monospace", fontSize: "0.9rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}>
-            Outbound Webhook Probes
+            DevOps Webhook Triggers
           </h3>
           <form onSubmit={handleCreateWebhook} style={{ display: "flex", gap: "10px", marginBottom: "1.5rem" }}>
             <input
@@ -106,10 +106,11 @@ export default function Integrations() {
               value={webhookEvent}
               onChange={(e) => setWebhookEvent(e.target.value)}
               className="brutalist-input"
-              style={{ width: "150px" }}
+              style={{ width: "160px" }}
             >
-              <option value="lead.created">Lead Created</option>
-              <option value="content.published">Content Published</option>
+              <option value="build.completed">Build Completed</option>
+              <option value="build.failed">Build Failed</option>
+              <option value="pr.opened">Pull Request Opened</option>
             </select>
             <button type="submit" className="brutalist-button" style={{ padding: "0.5rem" }}>
               <Plus size={14} /> Add

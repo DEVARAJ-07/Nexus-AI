@@ -21,11 +21,11 @@ export default function Navbar() {
   const navItems = [
     { href: "/", label: "HOME", icon: Home },
     { href: "/dashboard", label: "DASHBOARD", icon: LayoutDashboard },
-    { href: "/intelligence", label: "INTELLIGENCE", icon: Brain },
-    { href: "/content", label: "CONTENT STUDIO", icon: FileText },
-    { href: "/crm", label: "CRM & LEADS", icon: Target },
-    { href: "/analytics", label: "ANALYTICS", icon: BarChart4 },
-    { href: "/automation", label: "AUTOMATION", icon: Cpu },
+    { href: "/intelligence", label: "LOG INTELLIGENCE", icon: Brain },
+    { href: "/content", label: "RELEASE STUDIO", icon: FileText },
+    { href: "/crm", label: "PIPELINES & REPOS", icon: Target },
+    { href: "/analytics", label: "PIPELINE ANALYTICS", icon: BarChart4 },
+    { href: "/automation", label: "DEVOPS AUTOMATION", icon: Cpu },
     { href: "/integrations", label: "INTEGRATIONS", icon: Network },
     { href: "/settings", label: "SETTINGS", icon: SettingsIcon },
   ];
@@ -34,7 +34,7 @@ export default function Navbar() {
     <aside className="sidebar">
       <div className="sidebar-logo">
         <TerminalIcon size={18} strokeWidth={2.5} style={{ color: "var(--text-primary)" }} />
-        <span>OUTPOST AI</span>
+        <span>NEXUS AI</span>
       </div>
 
       <nav className="sidebar-nav">

@@ -2,8 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 let documents = [
-  { id: "doc-1", name: "Q1_Marketing_Strategy.pdf", fileUrl: "https://supabase-storage.com/doc-1.pdf", status: "READY" },
-  { id: "doc-2", name: "Outpost_User_Feedback.csv", fileUrl: "https://supabase-storage.com/doc-2.csv", status: "READY" }
+  { id: "doc-1", name: "nexus_architecture_spec.pdf", fileUrl: "https://supabase-storage.com/doc-1.pdf", status: "READY" },
+  { id: "doc-2", name: "nexus_build_log_failures.log", fileUrl: "https://supabase-storage.com/doc-2.log", status: "READY" }
 ];
 
 router.get("/", (req, res) => {

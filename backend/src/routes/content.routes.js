@@ -3,15 +3,15 @@ const router = express.Router();
 
 // Mock Brand Voice Profile
 let brandVoice = {
-  tone: ["Professional", "Informative", "Clear"],
-  vocabulary: ["AI-native", "Synergy", "Operational Speed"],
-  styleProfile: "Modern, structured paragraph layout with clear takeaways."
+  tone: ["Technical", "Direct", "Structured"],
+  vocabulary: ["monorepo", "cache-miss", "diagnostics", "pipeline"],
+  styleProfile: "Structured category sections (Features, Fixes, Deployments) with code blocks."
 };
 
 // Mock Content List
 let contentPieces = [
-  { id: "c-1", type: "blog", title: "Why Startups Need One AI Workspace", body: "<p>Startups spend significant time switching contexts...</p>", status: "PUBLISHED", scheduledAt: null },
-  { id: "c-2", type: "social", title: "Automate lead scoring in 10s", body: "<p>Most CRM databases are passive. Leverage active Claude intelligence...</p>", status: "DRAFT", scheduledAt: null }
+  { id: "c-1", type: "release_notes", title: "Release Notes v1.2.0-beta", body: "<h1>Release Notes</h1><p>Core JWT endpoints added, connection pools patched.</p>", status: "PUBLISHED", scheduledAt: null },
+  { id: "c-2", type: "changelog", title: "Changelog updates for database scripts", body: "<p>Initial prisma migrations verified.</p>", status: "DRAFT", scheduledAt: null }
 ];
 
 router.post("/generate", (req, res) => {
@@ -20,7 +20,7 @@ router.post("/generate", (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  const streamText = `<h1>${topic}</h1><p>Generated under ${tone || "Professional"} tone profile.</p><p>Outpost AI automates content workflows across platforms instantly.</p>`;
+  const streamText = `<h1>Release Notes</h1><p>Generated under ${tone || "Technical"} format for commits: <em>${topic}</em>.</p><p>Nexus AI successfully compiled release details and repository build changelogs.</p>`;
   const words = streamText.split(" ");
   let idx = 0;
 

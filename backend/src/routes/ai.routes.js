@@ -12,11 +12,11 @@ router.get("/chat-stream", (req, res) => {
 
   const tokens = [
     "This", " ", "is", " ", "an", " ", "AI-generated", " ", "response", " ",
-    "from", " ", "Claude", " ", "3.5", " ", "Haiku,", " ", "processed", " ",
-    "by", " ", "the", " ", "Intelligence", " ", "Hub.", " ",
-    "I", " ", "can", " ", "readily", " ", "analyze", " ", "documents,", " ",
-    "score", " ", "CRM", " ", "leads,", " ", "and", " ", "synthesize", " ",
-    "reports."
+    "from", " ", "Claude", " ", "3.5", " ", "Sonnet,", " ", "processed", " ",
+    "by", " ", "the", " ", "Log", " ", "Intelligence", " ", "engine.", " ",
+    "I", " ", "can", " ", "readily", " ", "diagnose", " ", "pipeline", " ",
+    "failures,", " ", "analyze", " ", "build", " ", "logs,", " ", "and", " ",
+    "generate", " ", "code", " ", "patches."
   ];
 
   let currentToken = 0;
@@ -42,7 +42,7 @@ router.post("/research", (req, res) => {
   res.status(200).json({
     topic,
     summary: `Structured summary about ${topic}. Retrieved citations from active web search probes.`,
-    citations: ["https://docs.outpost-ai.com/research", "https://wikipedia.org"],
+    citations: ["https://docs.nexus-ci.com/research", "https://wikipedia.org"],
   });
 });
 

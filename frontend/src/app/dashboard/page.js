@@ -8,43 +8,43 @@ export default function Dashboard() {
   const modules = [
     {
       id: "intelligence",
-      title: "Intelligence Hub",
-      desc: "Ask questions, build knowledge base, chat with PDFs/documents, and run web research agents.",
+      title: "Log & Pipeline Intelligence",
+      desc: "Analyze build logs, trace pipeline anomalies, and auto-generate code patch files with AI engines.",
       icon: <Brain size={20} />,
       path: "/intelligence",
     },
     {
       id: "content",
-      title: "Content Studio",
-      desc: "Generate blogs, social captions, emails, and ad copy. Manage drafts and scheduling calendar.",
+      title: "Release & Docs Studio",
+      desc: "Instantly compile technical changelogs, build release notes, and synthesize detailed pull request descriptions.",
       icon: <FileText size={20} />,
       path: "/content",
     },
     {
       id: "crm",
-      title: "CRM & Lead Engine",
-      desc: "Track prospects, manage pipeline stages via Kanban boards, and view AI-generated Lead Scores.",
+      title: "Pipelines & Repositories",
+      desc: "Track code repositories, manage deployment phases (dev-to-prod) via Kanban boards, and run AI health diagnostics.",
       icon: <Target size={20} />,
       path: "/crm",
     },
     {
       id: "analytics",
-      title: "Analytics Command",
-      desc: "Explore activity heatmaps, conversion funnels, and read automated AI Insight Cards.",
+      title: "Pipeline Analytics",
+      desc: "Analyze compilation and build duration trends, test failure alerts, and cross-pipeline insights.",
       icon: <BarChart4 size={20} />,
       path: "/analytics",
     },
     {
       id: "automation",
-      title: "Automation Forge",
-      desc: "Build drag-and-drop trigger-action workflows to connect Outpost AI modules to external apps.",
+      title: "DevOps Automation",
+      desc: "Configure visual trigger-action flows linking GitHub commits to test suites, deploy pipelines, and Slack notifications.",
       icon: <Cpu size={20} />,
       path: "/automation",
     },
     {
       id: "integrations",
-      title: "Integration Gateway",
-      desc: "Connect Slack, Notion, Drive, or configure inbound/outbound webhooks and API keys.",
+      title: "DevOps Integrations",
+      desc: "Link repositories and deployment platforms (GitHub, GitLab, Vercel, Render, AWS) or create client API tokens.",
       icon: <Network size={20} />,
       path: "/integrations",
     },
@@ -56,11 +56,11 @@ export default function Dashboard() {
         <div>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 800 }}>Workspace Dashboard</h2>
           <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-            Unified business workspace. 6 modules active. 0 tools context-switching.
+            Unified DevOps workspace. 6 modules active. 0 tools context-switching.
           </p>
         </div>
         <div style={{ display: "flex", gap: "10px" }} className="topbar-meta">
-          <span>WORKSPACE: OUTPOST HQ</span> | <span style={{ color: "var(--color-success)", fontWeight: 700 }}>PLAN: PRO</span>
+          <span>WORKSPACE: NEXUS HQ</span> | <span style={{ color: "var(--color-success)", fontWeight: 700 }}>PLAN: ENTERPRISE</span>
         </div>
       </div>
 
@@ -76,8 +76,8 @@ export default function Dashboard() {
         justifyContent: "space-between",
         alignItems: "center"
       }}>
-        <span>💡 AI INSIGHT: 3 hot leads have not been contacted in 5+ days. We recommend generating a follow-up email.</span>
-        <Link href="/crm" style={{ textDecoration: "underline", fontWeight: 700 }}>RESOLVE</Link>
+        <span>💡 AI INSIGHT: Build failure detected in pipeline 'nexus-auth-service' due to database connection timeout. We recommend running diagnostics.</span>
+        <Link href="/intelligence" style={{ textDecoration: "underline", fontWeight: 700 }}>RESOLVE</Link>
       </div>
 
       <h3 style={{ fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--color-taupe)", marginBottom: "1rem" }}>

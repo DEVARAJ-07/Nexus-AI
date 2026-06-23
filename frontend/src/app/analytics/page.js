@@ -1,21 +1,21 @@
 import React from "react";
-import { TrendingUp, AlertTriangle, Lightbulb, PieChart } from "lucide-react";
+import { TrendingUp, AlertTriangle, Lightbulb, BarChart4, CheckCircle } from "lucide-react";
 
 export default function Analytics() {
   const insights = [
     {
       id: "insight-1",
-      title: "Content CTR anomaly detected",
-      description: "Click-through rate for LinkedIn social posts dropped by 12.4% over the last 7 days compared to average.",
-      metrics: "LinkedIn CTR: 2.1% (Previous: 3.4%)",
-      suggestion: "Rewrite post outlines using brand-voice parameters and generate new campaigns.",
+      title: "Build duration cache miss detected",
+      description: "Build duration for 'nexus-frontend-client' increased by 237% over the last 5 pipeline runs due to a webpack loader cache miss.",
+      metrics: "Build time: 135s (Target: <45s)",
+      suggestion: "Enable caching options in DevOps Automation Forge settings or check node_modules dependencies.",
     },
     {
       id: "insight-2",
-      title: "Pipeline velocity drop-off",
-      description: "Prospect contacts are spending an average of 8.2 days in the 'Qualified' stage, causing a bottleneck.",
-      metrics: "Qualified Bottleneck Index: 8.2d (Target: 3.0d)",
-      suggestion: "Trigger an automation sequence in Automation Forge to dispatch email follow-ups via Resend.",
+      title: "Consecutive test failure anomaly",
+      description: "Branch 'hotfix/db-leak' in 'nexus-data-pipeline' failed unit tests in 3 consecutive runs on route: GET /api/v1/aggregate.",
+      metrics: "Failure streak: 3 runs (Build #492, #493, #494)",
+      suggestion: "Launch Log Intelligence module, paste build log outputs, and apply the generated code repair diff.",
     },
   ];
 
@@ -23,19 +23,19 @@ export default function Analytics() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
         <div>
-          <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>Analytics Command Center</h3>
+          <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>Pipeline Analytics Command</h3>
           <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-            Real-time cross-module metrics analysis and anomaly detection insights.
+            Real-time pipeline duration trend analyzer and integration test analytics.
           </p>
         </div>
       </div>
 
       {/* Analytics chart panels */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2.5rem" }}>
-        {/* Core activity trend chart mock */}
+        {/* Core build duration trend chart */}
         <div style={{ border: "1px solid var(--border-color)", padding: "1.5rem", backgroundColor: "var(--color-off-white)" }}>
           <h4 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <TrendingUp size={14} /> Workspace Activity Trend (Last 5 Days)
+            <TrendingUp size={14} /> Build Duration Trend (Last 5 Runs in Seconds)
           </h4>
           <div style={{
             display: "flex",
@@ -50,65 +50,65 @@ export default function Analytics() {
           }}>
             {/* Bar 1 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-              <div style={{ height: "40px", width: "30px", backgroundColor: "var(--color-slate)" }} />
-              <span>06-18</span>
+              <div style={{ height: "40px", width: "30px", backgroundColor: "var(--color-steel)" }} title="40 seconds" />
+              <span>#490</span>
             </div>
             {/* Bar 2 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-              <div style={{ height: "65px", width: "30px", backgroundColor: "var(--color-slate)" }} />
-              <span>06-19</span>
+              <div style={{ height: "65px", width: "30px", backgroundColor: "var(--color-steel)" }} title="65 seconds" />
+              <span>#491</span>
             </div>
             {/* Bar 3 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-              <div style={{ height: "90px", width: "30px", backgroundColor: "var(--color-slate)" }} />
-              <span>06-20</span>
+              <div style={{ height: "90px", width: "30px", backgroundColor: "var(--color-steel)" }} title="90 seconds" />
+              <span>#492</span>
             </div>
             {/* Bar 4 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-              <div style={{ height: "110px", width: "30px", backgroundColor: "var(--color-slate)" }} />
-              <span>06-21</span>
+              <div style={{ height: "110px", width: "30px", backgroundColor: "var(--color-steel)" }} title="110 seconds" />
+              <span>#493</span>
             </div>
             {/* Bar 5 */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-              <div style={{ height: "135px", width: "30px", backgroundColor: "var(--color-slate)" }} />
-              <span>06-22</span>
+              <div style={{ height: "135px", width: "30px", backgroundColor: "var(--color-failed)" }} title="135 seconds (Cache Miss)" />
+              <span style={{ color: "var(--color-failed)", fontWeight: 700 }}>#494</span>
             </div>
           </div>
         </div>
 
-        {/* Lead funnel conversion chart mock */}
+        {/* DevOps delivery conversion chart */}
         <div style={{ border: "1px solid var(--border-color)", padding: "1.5rem", backgroundColor: "var(--color-off-white)" }}>
           <h4 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <PieChart size={14} /> Pipeline Conversion Funnel
+            <BarChart4 size={14} /> Pipeline Delivery Pass Rates
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", fontSize: "0.75rem", fontFamily: "monospace" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>NEW LEADS</span>
-                <span>100% (320 leads)</span>
+                <span>COMMITS TRIGGERED</span>
+                <span>100% (320 runs)</span>
               </div>
               <div style={{ height: "8px", width: "100%", backgroundColor: "var(--color-slate)" }} />
             </div>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>CONTACTED</span>
-                <span>80% (256 leads)</span>
+                <span>STATIC ANALYSIS / LINT</span>
+                <span>92% (294 runs)</span>
               </div>
-              <div style={{ height: "8px", width: "80%", backgroundColor: "var(--color-slate)" }} />
+              <div style={{ height: "8px", width: "92%", backgroundColor: "var(--color-slate)" }} />
             </div>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>QUALIFIED</span>
-                <span>50% (160 leads)</span>
+                <span>UNIT / INTEGRATION TESTS</span>
+                <span>78% (249 runs)</span>
               </div>
-              <div style={{ height: "8px", width: "50%", backgroundColor: "var(--color-slate)" }} />
+              <div style={{ height: "8px", width: "78%", backgroundColor: "var(--color-slate)" }} />
             </div>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>CLOSED WON</span>
-                <span>10% (32 leads)</span>
+                <span>PRODUCTION DEPLOYMENTS</span>
+                <span>60% (192 runs)</span>
               </div>
-              <div style={{ height: "8px", width: "10%", backgroundColor: "var(--color-success)" }} />
+              <div style={{ height: "8px", width: "60%", backgroundColor: "var(--color-success)" }} />
             </div>
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function Analytics() {
 
       {/* AI generated insights feed */}
       <h4 style={{ fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--color-taupe)", marginBottom: "1rem" }}>
-        AI Insights Feed (Active Probes)
+        AI Pipeline Diagnostic Anomalies
       </h4>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>

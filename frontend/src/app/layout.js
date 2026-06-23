@@ -10,7 +10,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata = {
-  title: "Outpost AI - Business Command Center",
+  title: "Nexus AI - Command Center",
   description: "One platform. Six superpowers. Zero context-switching.",
 };
 
@@ -22,7 +22,7 @@ export default function RootLayout({ children }) {
           <Navbar />
           <div className="main-area">
             <header className="topbar">
-              <div className="topbar-title">Outpost Command Center</div>
+              <div className="topbar-title">Nexus AI Command Center</div>
               <div className="topbar-meta">V.0.1</div>
             </header>
             <main className="content-container">

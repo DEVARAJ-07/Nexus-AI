@@ -1,9 +1,9 @@
-# Outpost AI — Business Command Center 🧠 [Beta Version]
+# Nexus AI — Pipeline Command Center 🧠 [Beta Version]
 
 > [!IMPORTANT]
-> This repository contains the **Beta Version** of the Outpost AI Business Command Center. Active development is underway for core AI workflows, CRM pipelines, and integrations.
+> This repository contains the **Beta Version** of the Nexus AI Pipeline Command Center. Active development is underway for core AI workflows, repository pipelines, and integrations.
 
-Outpost AI is an AI-powered all-in-one business command center that helps teams manage intelligence, content creation, leads, analytics, workflows, and integrations from a single unified platform. Replace 5–10 tools with one AI-native workspace.
+Nexus AI is an AI-powered all-in-one developer pipeline command center that helps teams manage build log intelligence, release changelogs, repository pipelines, analytics, workflows, and integrations from a single unified platform. Replace 5–10 tools with one AI-native workspace.
 
 Core Promise: **One platform. Six superpowers. Zero context-switching.**
 
@@ -12,27 +12,27 @@ Core Promise: **One platform. Six superpowers. Zero context-switching.**
 ## 🏗️ Architecture Layout
 
 ```
-[ Frontend: React + Vite SPA ] ◄──(HTTPS REST / WebSockets)──► [ Backend: Node.js + Express ]
-                                                                      │
-                                                                      ├──► Supabase DB & Auth
-                                                                      ├──► Upstash Redis (BullMQ)
-                                                                      └──► Claude & OpenAI APIs
+[ Frontend: Next.js App Router ] ◄──(HTTPS REST / SSE Streams)──► [ Backend: Node.js + Express ]
+                                                                        │
+                                                                        ├──► Supabase DB & Auth
+                                                                        ├──► Upstash Redis (BullMQ)
+                                                                        └──► Claude & OpenAI APIs
 ```
 
-- **frontend/**: React + Vite SPA (Tailwind styled, Zustand state management, react-router v6 navigation).
-- **backend/**: Node.js + Express.js API server (real-time Socket.io, BullMQ worker queues, Claude stream API integrations).
-- **database/**: Prisma ORM schemas mapping all workspace, intelligence, content, crm, and automation tables.
+- **frontend/**: Next.js App Router workspace (Vanilla CSS, Zustand state management, lucide-react iconography).
+- **backend/**: Node.js + Express.js API server (real-time streaming API, BullMQ worker queues, Claude stream API integrations).
+- **database/**: Prisma ORM schemas mapping all workspace, pipeline, and automation tables.
 
 ---
 
 ## 🔌 Modules Map
 
-1. **🧠 Intelligence Hub** (`/intelligence`): Knowledge base semantic search, document Q&A, and web research summaries.
-2. **✍️ Content Studio** (`/content`): SEO long-form post generator, content calendar scheduler, andbrand voice analyzer.
-3. **🎯 CRM & Lead Engine** (`/crm`): Prospects Kanban card pipelines and AI lead scoring (1-100).
-4. **📊 Analytics Center** (`/analytics`): conversion funnels, activity heatmaps, and AI metrics insight cards.
-5. **⚡ Automation Forge** (`/automation`): Visual drag-and-drop node builders for triggers and actions mapping.
-6. **🔌 Integration Gateway** (`/integrations`): Prebuilt marketplace bindings (Slack, Notion), API Keys generation, and webhooks config.
+1. **🧠 Log & Pipeline Intelligence** (`/intelligence`): Build log failure diagnosis, interactive code patch diff generation, and vulnerability security scanners.
+2. **✍️ Release & Docs Studio** (`/content`): Technical changelog compiler, release notes generator, and PR description synthesis.
+3. **🎯 Pipeline Kanban & Repositories** (`/crm`): Active branch delivery visualizer and AI health diagnostics engine.
+4. **📊 Pipeline Analytics** (`/analytics`): Build duration trends, cache anomaly warnings, and test failure tracking.
+5. **⚡ DevOps Automation** (`/automation`): Visual trigger-action engine mapping Git hooks to test execution, deploys, and alerts.
+6. **🔌 DevOps Integrations** (`/integrations`): Prebuilt marketplace credentials (GitHub, Vercel, Render), API Token key vault, and webhook triggers.
 
 ---
 
@@ -50,13 +50,10 @@ Generate database schema typings:
 npm run db:generate
 ```
 
-### 3. Run Development Environments
-Start the backend and frontend dev environments concurrently:
+### 3. Run Production Server Environments
+Start the backend and frontend dev/start environments concurrently:
 ```bash
-# Start backend API (Default Port: 5000)
-npm run dev:backend
-
-# Start frontend UI (Default Port: 5173)
-npm run dev:frontend
+# Start backend API (Default Port: 5000) and Frontend Next.js (Default Port: 3000)
+npm run start
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser to launch the command center.
+Open [http://localhost:3000](http://localhost:3000) in your browser to launch the command center.

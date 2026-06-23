@@ -1,29 +1,34 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, Calendar as CalendarIcon, FileEdit } from "lucide-react";
+import { Sparkles, Calendar as CalendarIcon, FileEdit, Check, GitCommit, FileText, Loader2 } from "lucide-react";
 
 export default function Content() {
-  const [contentType, setContentType] = useState("blog");
-  const [topic, setTopic] = useState("");
-  const [tone, setTone] = useState("Professional");
+  const [docType, setDocType] = useState("release_notes");
+  const [commitsSummary, setCommitsSummary] = useState("");
+  const [tone, setTone] = useState("Technical");
   const [output, setOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [brandExamples, setBrandExamples] = useState("");
-  const [brandVoiceText, setBrandVoiceText] = useState("");
+  const [styleExamples, setStyleExamples] = useState("");
+  const [styleProfileText, setStyleProfileText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isPushed, setIsPushed] = useState(false);
+  const [pushing, setPushing] = useState(false);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
-    if (!topic || isGenerating) return;
+    if (!commitsSummary || isGenerating) return;
 
     setOutput("");
     setIsGenerating(true);
+    setIsPushed(false);
 
     try {
+      // Connect to Express backend if online
       const response = await fetch("http://localhost:5000/api/content/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: contentType, topic, tone }),
+        body: JSON.stringify({ type: docType, topic: commitsSummary, tone }),
       });
 
       if (!response.ok) throw new Error("Backend offline");
@@ -57,17 +62,32 @@ export default function Content() {
         }
       }
     } catch (err) {
-      console.log("Using client-side mock content generator:", err);
+      console.log("Using client-side mock doc generator:", err);
+      
+      // Beautiful mock Markdown output streaming
+      const headerTitle = docType === "release_notes" ? "Release Notes - v1.2.0" 
+                        : docType === "changelog" ? "CHANGELOG.md (v1.2.0)"
+                        : docType === "pr_desc" ? "Pull Request Description"
+                        : "API Schema Specifications";
+
       const mockTokens = [
-        `<h1>${topic}</h1>`,
-        "<p>Generated under a corporate tone profile.</p>",
-        "<p>Context switching takes away valuable product building hours.</p>",
-        "<p>Centralizing workspaces under Outpost AI enables startups to operate at extreme velocity.</p>"
+        `# ${headerTitle}\n\n`,
+        `Generated under **${tone}** specifications.\n\n`,
+        "### 🚀 Features & Enhancements\n",
+        "- **Core Auth Pipeline**: Integrated security authorization headers and route interceptors.\n",
+        "- **Prisma Connection Pooling**: Configured session-specific timeouts and pool sizes.\n\n",
+        "### 🐛 Bug Fixes\n",
+        "- **CLI startnode command**: Patched root script bindings to prevent runtime execution failures.\n",
+        "- **UI Latency**: Optimized cubic-bezier easing variables to eliminate screen jitter during page loads.\n\n",
+        "### ⚙️ Deployment Info\n",
+        "- **Target Engine**: Node v24 LTS + PostgreSQL\n",
+        "- **Artifact Hash**: `sha256-f8a7d90d...`"
       ];
+
       let buffer = "";
       for (let i = 0; i < mockTokens.length; i++) {
         await new Promise((r) => setTimeout(r, 120));
-        buffer += mockTokens[i] + " ";
+        buffer += mockTokens[i];
         setOutput(buffer);
       }
     } finally {
@@ -75,15 +95,28 @@ export default function Content() {
     }
   };
 
-  const handleBrandVoice = (e) => {
+  const handleAnalyzeStyle = (e) => {
     e.preventDefault();
-    if (!brandExamples) return;
-    setBrandVoiceText("Analyzing style guide examples...");
+    if (!styleExamples) return;
+    setIsAnalyzing(true);
+    setStyleProfileText("Scanning style guide inputs and extracting layout rules...");
+    
     setTimeout(() => {
-      setBrandVoiceText(
-        "Tone Profile: Technical, Direct.\nVocabulary patterns: monorepo, workspaces, fast-builds.\nStyle description: Short sentences with bullet points and bold headers."
+      setStyleProfileText(
+        "Style Profile: High Technical Density.\nVocabulary rules: Renders file schema hashes, utilizes emoji category labels.\nTemplate detected: Group by Features ➔ Fixes ➔ Deployments."
       );
+      setIsAnalyzing(false);
     }, 1000);
+  };
+
+  const pushToRepository = () => {
+    if (!output || pushing) return;
+    setPushing(true);
+    
+    setTimeout(() => {
+      setPushing(false);
+      setIsPushed(true);
+    }, 1200);
   };
 
   return (
@@ -91,83 +124,92 @@ export default function Content() {
       {/* Left Input Column */}
       <div>
         <h3 style={{ fontFamily: "monospace", fontSize: "0.9rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}>
-          AI Content Generator
+          AI Release Compiler
         </h3>
 
         <form onSubmit={handleGenerate} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-            <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>CONTENT TYPE</label>
+            <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>DOCUMENT TYPE</label>
             <select
-              value={contentType}
-              onChange={(e) => setContentType(e.target.value)}
+              value={docType}
+              onChange={(e) => setDocType(e.target.value)}
               className="brutalist-input"
               style={{ height: "40px" }}
             >
-              <option value="blog">Blog / Article</option>
-              <option value="social">Social Caption (LinkedIn / Twitter)</option>
-              <option value="email">Email Sequence</option>
-              <option value="ad">Ad Copy</option>
+              <option value="release_notes">Release Notes Document</option>
+              <option value="changelog">Changelog (CHANGELOG.md)</option>
+              <option value="pr_desc">Pull Request Description</option>
+              <option value="api_docs">API Schema Docs</option>
             </select>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-            <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>TOPIC / KEYWORDS</label>
-            <input
-              type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. Why workspaces monorepo structure makes tsc clean"
+            <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>COMMIT LOG / DIFF HIGHLIGHTS</label>
+            <textarea
+              value={commitsSummary}
+              onChange={(e) => setCommitsSummary(e.target.value)}
+              placeholder="e.g. feat: add jwt validation; fix: prisma session timeouts; fix: add startnode scripts to monorepo config"
               className="brutalist-input"
+              rows={4}
               required
             />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-            <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>TONE</label>
+            <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>TONE FORMAT</label>
             <select
               value={tone}
               onChange={(e) => setTone(e.target.value)}
               className="brutalist-input"
               style={{ height: "40px" }}
             >
-              <option value="Professional">Professional</option>
-              <option value="Bold">Bold</option>
-              <option value="Casual">Casual</option>
+              <option value="Technical">Technical (Strict & Detailed)</option>
+              <option value="Executive">Executive (High-Level Summary)</option>
+              <option value="Changelog Standard">Changelog Standard (Semantic)</option>
             </select>
           </div>
 
           <button type="submit" className="brutalist-button" disabled={isGenerating}>
-            <Sparkles size={14} /> {isGenerating ? "GENERATING..." : "COMPILE DRAFT"}
+            {isGenerating ? (
+              <>
+                <Loader2 size={14} className="animate-spin" /> COMPILING DRAFT...
+              </>
+            ) : (
+              <>
+                <Sparkles size={14} /> COMPILE DOCUMENT DRAFT
+              </>
+            )}
           </button>
         </form>
 
-        {/* Brand Voice analysis */}
+        {/* Style Guide Analyzer */}
         <div style={{ border: "1px solid var(--border-color)", padding: "1.25rem", backgroundColor: "var(--color-warm-grey)", marginTop: "2rem" }}>
           <h4 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", marginBottom: "0.75rem" }}>
-            Brand Voice training
+            Repository Style Guide Analyzer
           </h4>
-          <form onSubmit={handleBrandVoice} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <form onSubmit={handleAnalyzeStyle} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             <textarea
-              value={brandExamples}
-              onChange={(e) => setBrandExamples(e.target.value)}
-              placeholder="Paste 3+ content examples of your team's tone..."
+              value={styleExamples}
+              onChange={(e) => setStyleExamples(e.target.value)}
+              placeholder="Paste examples of previous changelogs or commit styles to copy layout patterns..."
               className="brutalist-input"
               rows={3}
             />
-            <button type="submit" className="brutalist-button">
-              Analyze Tone
+            <button type="submit" className="brutalist-button" disabled={isAnalyzing || !styleExamples}>
+              {isAnalyzing ? "Analyzing..." : "Analyze Style Patterns"}
             </button>
           </form>
-          {brandVoiceText && (
+          {styleProfileText && (
             <pre style={{
               marginTop: "1rem",
               fontSize: "0.7rem",
               whiteSpace: "pre-wrap",
               backgroundColor: "var(--color-off-white)",
               padding: "0.75rem",
-              border: "1px solid var(--border-color)"
+              border: "1px solid var(--border-color)",
+              fontFamily: "monospace"
             }}>
-              {brandVoiceText}
+              {styleProfileText}
             </pre>
           )}
         </div>
@@ -176,31 +218,51 @@ export default function Content() {
       {/* Right Output Editor Column */}
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         <h3 style={{ fontFamily: "monospace", fontSize: "0.9rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}>
-          TipTap Rich-Text Editor
+          Markdown Document Preview
         </h3>
 
         <div style={{
           border: "1px solid var(--border-color)",
           backgroundColor: "var(--color-off-white)",
-          minHeight: "350px",
+          minHeight: "380px",
           padding: "1.5rem",
           overflowY: "auto",
-          fontSize: "0.85rem"
+          fontSize: "0.85rem",
+          whiteSpace: "pre-wrap",
+          fontFamily: "Consolas, monospace",
+          lineHeight: "1.5"
         }}>
           {output ? (
-            <div dangerouslySetInnerHTML={{ __html: output }} />
+            output
           ) : (
-            <span style={{ color: "var(--text-secondary)" }}>Draft output will stream here in real-time...</span>
+            <span style={{ color: "var(--text-secondary)", fontFamily: "sans-serif" }}>Document markdown content will compile and stream here in real-time...</span>
           )}
         </div>
 
         {output && (
           <div style={{ display: "flex", gap: "1rem" }}>
-            <button className="brutalist-button" style={{ display: "flex", gap: "0.5rem" }}>
-              <CalendarIcon size={14} /> Schedule Post
+            <button 
+              onClick={pushToRepository}
+              className="brutalist-button" 
+              style={{ display: "flex", gap: "0.5rem", backgroundColor: "var(--color-slate)", color: "#ffffff" }}
+              disabled={pushing || isPushed}
+            >
+              {pushing ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Pushing...
+                </>
+              ) : isPushed ? (
+                <>
+                  <Check size={14} /> PUSHED TO REPOSITORY
+                </>
+              ) : (
+                <>
+                  <GitCommit size={14} /> Push to Repository
+                </>
+              )}
             </button>
             <button className="brutalist-button" style={{ display: "flex", gap: "0.5rem", backgroundColor: "transparent" }}>
-              <FileEdit size={14} /> Save Draft
+              <FileEdit size={14} /> Export File
             </button>
           </div>
         )}

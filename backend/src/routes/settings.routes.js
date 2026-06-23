@@ -3,19 +3,19 @@ const router = express.Router();
 
 let profile = {
   name: "John Doe",
-  email: "john@outpost.ai",
+  email: "john@nexus-ci.com",
   avatarUrl: "https://supabase-storage.com/avatars/john.jpg"
 };
 
 let workspace = {
-  name: "Outpost Headquarters",
-  logoUrl: "https://supabase-storage.com/logos/outpost.png",
+  name: "Nexus Headquarters",
+  logoUrl: "https://supabase-storage.com/logos/nexus.png",
   timezone: "UTC",
   language: "en"
 };
 
 let team = [
-  { id: "u-1", name: "John Doe", email: "john@outpost.ai", role: "ADMIN" },
+  { id: "u-1", name: "John Doe", email: "john@nexus-ci.com", role: "ADMIN" },
   { id: "u-2", name: "Sarah Connor", email: "sarah@skynet.com", role: "MEMBER" }
 ];
 

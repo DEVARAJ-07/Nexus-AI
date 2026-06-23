@@ -7,9 +7,9 @@ export default function Home() {
       {/* Welcome Hero */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid var(--border-color)", paddingBottom: "1.5rem" }}>
         <div>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: 800, letterSpacing: "-0.03em" }}>Outpost AI Command Center (v0.1)</h2>
+          <h2 style={{ fontSize: "1.75rem", fontWeight: 800, letterSpacing: "-0.03em" }}>Nexus AI Command Center (v0.1)</h2>
           <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-            AI-powered watchpost for business intelligence, content production, leads scoring, and workflows.
+            AI-powered command center for log analysis, repository tracking, release generation, and DevOps pipeline automation.
           </p>
         </div>
         <div style={{ display: "flex", gap: "10px", fontSize: "0.75rem", fontFamily: "monospace", backgroundColor: "var(--color-warm-grey)", padding: "0.5rem 0.75rem", border: "1px solid var(--border-color)" }}>
@@ -31,19 +31,19 @@ export default function Home() {
           <div>
             <strong style={{ display: "block", marginBottom: "0.25rem" }}>1. ACCESS THE DASHBOARD</strong>
             <p style={{ color: "var(--text-secondary)" }}>
-              Navigate to the <Link href="/dashboard" style={{ textDecoration: "underline", fontWeight: 700 }}>Dashboard</Link> to view all active workspace modules, alerts, and metrics.
+              Navigate to the <Link href="/dashboard" style={{ textDecoration: "underline", fontWeight: 700 }}>Dashboard</Link> to view active repository stats, build success rates, and pipeline health alerts.
             </p>
           </div>
           <div>
-            <strong style={{ display: "block", marginBottom: "0.25rem" }}>2. COMPILE WEB INTELLIGENCE</strong>
+            <strong style={{ display: "block", marginBottom: "0.25rem" }}>2. DIAGNOSE BUILD LOGS</strong>
             <p style={{ color: "var(--text-secondary)" }}>
-              Open <Link href="/intelligence" style={{ textDecoration: "underline", fontWeight: 700 }}>Intelligence</Link> to Q&A corporate docs or run active web research probes.
+              Open <Link href="/intelligence" style={{ textDecoration: "underline", fontWeight: 700 }}>Log Intelligence</Link> to upload build files or diagnose compile/test failures with auto-patch diff generation.
             </p>
           </div>
           <div>
-            <strong style={{ display: "block", marginBottom: "0.25rem" }}>3. SETUP AUTOMATION WORKFLOWS</strong>
+            <strong style={{ display: "block", marginBottom: "0.25rem" }}>3. AUTOMATE RELEASES & TRIGGERS</strong>
             <p style={{ color: "var(--text-secondary)" }}>
-              Go to <Link href="/automation" style={{ textDecoration: "underline", fontWeight: 700 }}>Automation</Link> to connect trigger events (like new lead) to instant actions.
+              Use <Link href="/content" style={{ textDecoration: "underline", fontWeight: 700 }}>Release Studio</Link> to compile technical changelogs and <Link href="/automation" style={{ textDecoration: "underline", fontWeight: 700 }}>DevOps Automation</Link> to link commits to deploys.
             </p>
           </div>
         </div>
@@ -57,15 +57,15 @@ export default function Home() {
         <div className="corner-dot br">+</div>
 
         <h3 style={{ fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", marginBottom: "2rem", alignSelf: "flex-start" }}>
-          🗺️ Vertical System Architecture
+          🗺️ Nexus System Architecture & Data Flow
         </h3>
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: "600px" }}>
           {/* USER_CLI / Trigger Event */}
-          <div style={{ fontFamily: "monospace", fontSize: "0.75rem", textAlign: "center", width: "100%" }}>
+          <div style={{ fontFamily: "monospace", fontSize: "0.75rem", textAlignment: "center", width: "100%" }}>
             <strong>USER_CLI / WEB_INGESTION</strong>
             <div style={{ borderLeft: "1px dotted var(--border-color)", height: "20px", margin: "0.25rem auto" }}></div>
-            <div style={{ color: "var(--text-secondary)" }}>[outpost run --branch main --module intelligence]</div>
+            <div style={{ color: "var(--text-secondary)" }}>[nexus run --branch main --module intelligence]</div>
             <div style={{ borderLeft: "1px dotted var(--border-color)", height: "20px", margin: "0.25rem auto" }}></div>
             <div style={{ fontSize: "0.75rem", marginTop: "-3px" }}>v</div>
           </div>
@@ -76,7 +76,7 @@ export default function Home() {
             <div className="corner-dot tr">+</div>
             <div className="corner-dot bl">+</div>
             <div className="corner-dot br">+</div>
-            <strong style={{ display: "block", marginBottom: "0.5rem" }}>OUTPOST API SERVER (:5000)</strong>
+            <strong style={{ display: "block", marginBottom: "0.5rem" }}>NEXUS API SERVER (:5000)</strong>
             <p style={{ margin: "0.25rem 0", color: "var(--text-secondary)", fontSize: "0.75rem" }}>:: Authenticates API tokens / webhooks</p>
             <p style={{ margin: "0.25rem 0", color: "var(--text-secondary)", fontSize: "0.75rem" }}>:: Stores metadata via Prisma PostgreSQL</p>
             <p style={{ margin: "0.25rem 0", color: "var(--text-secondary)", fontSize: "0.75rem" }}>:: Publishes job payload to Queue</p>
@@ -95,7 +95,7 @@ export default function Home() {
             <div className="corner-dot tr">+</div>
             <div className="corner-dot bl">+</div>
             <div className="corner-dot br">+</div>
-            <strong style={{ display: "block", marginBottom: "0.5rem" }}>OUTPOST WORKER / LANGGRAPH</strong>
+            <strong style={{ display: "block", marginBottom: "0.5rem" }}>NEXUS WORKER / LANGGRAPH</strong>
             
             <div style={{ border: "1px dotted var(--border-color)", padding: "0.5rem", margin: "0.5rem 0", backgroundColor: "var(--color-off-white)", position: "relative" }}>
               <div className="corner-dot tl">+</div>
@@ -207,8 +207,8 @@ export default function Home() {
               <div className="corner-dot tr">+</div>
               <div className="corner-dot bl">+</div>
               <div className="corner-dot br">+</div>
-              <strong style={{ fontSize: "0.75rem" }}>CRM TIMELINES</strong>
-              <div style={{ fontSize: "0.65rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>Lead score update</div>
+              <strong style={{ fontSize: "0.75rem" }}>PRODUCTION DEPLOY</strong>
+              <div style={{ fontSize: "0.65rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>Phased deployment sync</div>
             </div>
           </div>
 
