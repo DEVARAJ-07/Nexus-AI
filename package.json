@@ -1,21 +1,25 @@
 {
-  "name": "outpost-cicd",
-  "version": "0.1.0",
+  "name": "outpost-ai-monorepo",
+  "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "database"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "lucide-react": "^1.21.0",
-    "next": "16.2.9",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "install:all": "npm install",
+    "build": "npm run build:frontend",
+    "start": "concurrently \"npm run start -w frontend\" \"npm run dev:backend\"",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm run dev -w frontend",
+    "dev:backend": "npm run dev -w backend",
+    "build:frontend": "npm run build -w frontend",
+    "build:backend": "npm run build -w backend",
+    "db:generate": "npm run generate -w database",
+    "db:push": "npm run push -w database"
   },
   "devDependencies": {
-    "eslint": "^9",
-    "eslint-config-next": "16.2.9"
+    "concurrently": "^8.2.2"
   }
 }
