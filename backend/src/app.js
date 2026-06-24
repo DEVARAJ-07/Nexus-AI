@@ -13,6 +13,20 @@ app.use((req, res, next) => {
 });
 
 // Root check endpoint
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "ACTIVE",
+    service: "Nexus AI Backend API",
+    frontendUrl: "http://localhost:3000",
+    endpoints: {
+      health: "/health",
+      auth: "/api/auth",
+      ai: "/api/ai",
+      crm: "/api/crm"
+    }
+  });
+});
+
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
 });
