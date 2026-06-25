@@ -14,19 +14,65 @@ let pipelineNotes = [
   { id: "n-1", repoId: "repo-1", content: "Applied hotfix for DB pool leak. Checked connection limits.", createdBy: "Alex", createdAt: new Date() }
 ];
 
+async function getWorkspaceId(req) {
+  const headerWorkspaceId = req.headers["x-workspace-id"];
+  if (headerWorkspaceId) return headerWorkspaceId;
+
+  try {
+    let ws = await prisma.workspace.findFirst();
+    if (!ws) {
+      ws = await prisma.workspace.create({
+        data: {
+          name: "Default Workspace",
+          plan: "FREE",
+        },
+      });
+    }
+    return ws.id;
+  } catch (err) {
+    return "default-workspace-id";
+  }
+}
+
+function mapContactToRepository(contact) {
+  return {
+    id: contact.id,
+    name: contact.name,
+    branch: contact.source || "main",
+    stage: contact.stage || "DEV",
+    health: contact.score || 85,
+    email: contact.email,
+  };
+}
+
+async function seedDefaultRepositories(workspaceId) {
+  const defaults = [
+    { name: "nexus-auth-service", email: "auth@repo.nexus.ai", source: "master", stage: "PRODUCTION", score: 98, workspaceId },
+    { name: "nexus-backend-api", email: "api@repo.nexus.ai", source: "main", stage: "PRODUCTION", score: 95, workspaceId },
+    { name: "nexus-worker-node", email: "worker@repo.nexus.ai", source: "release/v0.1", stage: "STAGING", score: 85, workspaceId },
+    { name: "nexus-frontend-client", email: "frontend@repo.nexus.ai", source: "dev", stage: "TESTING", score: 74, workspaceId },
+    { name: "nexus-data-pipeline", email: "data@repo.nexus.ai", source: "hotfix/db-leak", stage: "DEV", score: 42, workspaceId }
+  ];
+  await prisma.contact.createMany({ data: defaults });
+}
+
 // Map endpoints originally for CRM to support Pipeline visualizer
 router.get("/contacts", async (req, res) => {
   try {
-    const contacts = await prisma.contact.findMany();
+    const workspaceId = await getWorkspaceId(req);
+    let contacts = await prisma.contact.findMany({
+      where: { workspaceId },
+    });
+
+    if (contacts.length === 0) {
+      await seedDefaultRepositories(workspaceId);
+      contacts = await prisma.contact.findMany({
+        where: { workspaceId },
+      });
+    }
+
     if (contacts.length > 0) {
-      const formatted = contacts.map(c => ({
-        id: c.id,
-        name: c.name,
-        branch: c.source || "main",
-        stage: c.stage,
-        health: c.score
-      }));
-      return res.status(200).json(formatted);
+      return res.status(200).json(contacts.map(mapContactToRepository));
     }
     res.status(200).json(repositories);
   } catch (err) {
@@ -45,24 +91,22 @@ router.post("/contacts", async (req, res) => {
     health: Math.floor(Math.random() * 30) + 70
   };
   try {
-    const ws = await prisma.workspace.findFirst();
-    if (ws) {
-      const created = await prisma.contact.create({
-        data: {
-          id: newRepo.id,
-          name,
-          email: `${name}@nexus-ci.com`,
-          source: branch || "main",
-          stage: stage || "DEV",
-          score: newRepo.health,
-          workspaceId: ws.id
-        }
-      });
-      newRepo.id = created.id;
-      newRepo.health = created.score;
-    }
+    const workspaceId = await getWorkspaceId(req);
+    const created = await prisma.contact.create({
+      data: {
+        id: newRepo.id,
+        name,
+        email: `${name.toLowerCase()}@repo.nexus.ai`,
+        source: branch || "main",
+        stage: stage || "DEV",
+        score: newRepo.health,
+        workspaceId,
+      },
+    });
+    newRepo.id = created.id;
+    newRepo.health = created.score;
     repositories.push(newRepo);
-    res.status(201).json(newRepo);
+    res.status(201).json(mapContactToRepository(created));
   } catch (err) {
     console.warn("[DB_FALLBACK] post /contacts failed, using mock:", err.message);
     repositories.push(newRepo);
@@ -73,15 +117,11 @@ router.post("/contacts", async (req, res) => {
 router.get("/contacts/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const c = await prisma.contact.findUnique({ where: { id } });
-    if (c) {
-      return res.status(200).json({
-        id: c.id,
-        name: c.name,
-        branch: c.source || "main",
-        stage: c.stage,
-        health: c.score
-      });
+    const contact = await prisma.contact.findUnique({
+      where: { id },
+    });
+    if (contact) {
+      return res.status(200).json(mapContactToRepository(contact));
     }
     const repo = repositories.find(r => r.id === id);
     if (!repo) return res.status(404).json({ error: "Repository not found" });
@@ -96,27 +136,23 @@ router.get("/contacts/:id", async (req, res) => {
 
 router.patch("/contacts/:id", async (req, res) => {
   const { id } = req.params;
+  const { name, branch, stage, health } = req.body;
   try {
     const c = await prisma.contact.findUnique({ where: { id } });
     if (c) {
       const updateData = {};
-      if (req.body.name) updateData.name = req.body.name;
-      if (req.body.branch) updateData.source = req.body.branch;
-      if (req.body.stage) updateData.stage = req.body.stage;
-      if (req.body.health !== undefined) updateData.score = req.body.health;
+      if (name) updateData.name = name;
+      if (branch) updateData.source = branch;
+      if (stage) updateData.stage = stage;
+      if (health !== undefined) updateData.score = health;
 
       const updated = await prisma.contact.update({
         where: { id },
-        data: updateData
+        data: updateData,
       });
+
+      const formatted = mapContactToRepository(updated);
       const index = repositories.findIndex(r => r.id === id);
-      const formatted = {
-        id: updated.id,
-        name: updated.name,
-        branch: updated.source || "main",
-        stage: updated.stage,
-        health: updated.score
-      };
       if (index !== -1) repositories[index] = formatted;
       return res.status(200).json(formatted);
     }
@@ -138,7 +174,9 @@ router.delete("/contacts/:id", async (req, res) => {
   try {
     const c = await prisma.contact.findUnique({ where: { id } });
     if (c) {
-      await prisma.contact.delete({ where: { id } });
+      await prisma.contact.delete({
+        where: { id },
+      });
     }
     repositories = repositories.filter(r => r.id !== id);
     res.status(200).json({ message: "Repository removed" });
@@ -162,15 +200,28 @@ router.post("/contacts/:id/notes", async (req, res) => {
   try {
     const c = await prisma.contact.findUnique({ where: { id } });
     if (c) {
-      const created = await prisma.note.create({
+      let user = await prisma.user.findFirst();
+      if (!user) {
+        const workspaceId = await getWorkspaceId(req);
+        user = await prisma.user.create({
+          data: {
+            email: "system@nexus.ai",
+            name: createdBy || "System",
+            role: "ADMIN",
+            workspaceId,
+          },
+        });
+      }
+
+      const note = await prisma.note.create({
         data: {
           id: newNote.id,
           contactId: id,
           content,
-          createdBy: "default-user-id"
-        }
+          createdBy: user.id,
+        },
       });
-      newNote.id = created.id;
+      newNote.id = note.id;
     }
     pipelineNotes.push(newNote);
     res.status(201).json(newNote);
@@ -189,16 +240,10 @@ router.patch("/contacts/:id/stage", async (req, res) => {
     if (c) {
       const updated = await prisma.contact.update({
         where: { id },
-        data: { stage }
+        data: { stage },
       });
+      const formatted = mapContactToRepository(updated);
       const index = repositories.findIndex(r => r.id === id);
-      const formatted = {
-        id: updated.id,
-        name: updated.name,
-        branch: updated.source || "main",
-        stage: updated.stage,
-        health: updated.score
-      };
       if (index !== -1) repositories[index] = formatted;
       return res.status(200).json(formatted);
     }
@@ -217,16 +262,20 @@ router.patch("/contacts/:id/stage", async (req, res) => {
 
 router.get("/pipeline", async (req, res) => {
   try {
-    const contacts = await prisma.contact.findMany();
+    const workspaceId = await getWorkspaceId(req);
+    let contacts = await prisma.contact.findMany({
+      where: { workspaceId },
+    });
+
+    if (contacts.length === 0) {
+      await seedDefaultRepositories(workspaceId);
+      contacts = await prisma.contact.findMany({
+        where: { workspaceId },
+      });
+    }
+
     if (contacts.length > 0) {
-      const formatted = contacts.map(c => ({
-        id: c.id,
-        name: c.name,
-        branch: c.source || "main",
-        stage: c.stage,
-        health: c.score
-      }));
-      return res.status(200).json(formatted);
+      return res.status(200).json(contacts.map(mapContactToRepository));
     }
     res.status(200).json(repositories);
   } catch (err) {
@@ -237,20 +286,31 @@ router.get("/pipeline", async (req, res) => {
 
 router.get("/companies", async (req, res) => {
   try {
-    const companies = await prisma.company.findMany();
-    if (companies.length > 0) {
-      const formatted = companies.map(comp => ({
-        id: comp.id,
-        name: comp.name,
-        status: comp.website || "HEALTHY",
-        nodesCount: 12,
-        pipelineValue: 100
-      }));
-      return res.status(200).json(formatted);
+    const workspaceId = await getWorkspaceId(req);
+    let companies = await prisma.company.findMany({
+      where: { workspaceId },
+    });
+
+    if (companies.length === 0) {
+      const defaultCompany = await prisma.company.create({
+        data: {
+          id: "cluster-1",
+          name: "Nexus Kubernetes Cluster",
+          website: "k8s.nexus.ai",
+          industry: "Technology",
+          workspaceId,
+        },
+      });
+      companies = [defaultCompany];
     }
-    res.status(200).json([
-      { id: "cluster-1", name: "Nexus Kubernetes Cluster", status: "HEALTHY", nodesCount: 12, pipelineValue: 100 }
-    ]);
+
+    res.status(200).json(companies.map(c => ({
+      id: c.id,
+      name: c.name,
+      status: "HEALTHY",
+      nodesCount: 12,
+      pipelineValue: 100,
+    })));
   } catch (err) {
     console.warn("[DB_FALLBACK] get /companies failed, using mock:", err.message);
     res.status(200).json([
@@ -262,33 +322,40 @@ router.get("/companies", async (req, res) => {
 router.post("/import", (req, res) => {
   res.status(200).json({
     message: "Repositories imported successfully",
-    count: 2
+    count: 2,
   });
 });
 
 router.get("/score-report", async (req, res) => {
   try {
-    const contacts = await prisma.contact.findMany();
-    if (contacts.length > 0) {
-      const totalHealth = contacts.reduce((sum, c) => sum + c.score, 0);
-      const avg = Math.round(totalHealth / contacts.length);
-      const distribution = { "0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0 };
-      let anomalies = 0;
-      contacts.forEach(c => {
-        if (c.score <= 20) distribution["0-20"]++;
-        else if (c.score <= 40) distribution["21-40"]++;
-        else if (c.score <= 60) distribution["41-60"]++;
-        else if (c.score <= 80) distribution["61-80"]++;
-        else distribution["81-100"]++;
+    const workspaceId = await getWorkspaceId(req);
+    const contacts = await prisma.contact.findMany({
+      where: { workspaceId },
+    });
 
-        if (c.score < 50) anomalies++;
+    if (contacts.length > 0) {
+      const scores = contacts.map(c => c.score || 0);
+      const averageHealth = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+
+      const distribution = { "0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0 };
+      contacts.forEach(c => {
+        const s = c.score || 0;
+        if (s <= 20) distribution["0-20"]++;
+        else if (s <= 40) distribution["21-40"]++;
+        else if (s <= 60) distribution["41-60"]++;
+        else if (s <= 80) distribution["61-80"]++;
+        else distribution["81-100"]++;
       });
+
+      const anomaliesCount = contacts.filter(c => (c.score || 0) < 50).length;
+
       return res.status(200).json({
-        averageHealth: avg,
+        averageHealth,
         distribution,
-        anomaliesCount: anomalies
+        anomaliesCount,
       });
     }
+    
     res.status(200).json({
       averageHealth: 88,
       distribution: { "0-20": 0, "21-40": 1, "41-60": 0, "61-80": 1, "81-100": 3 },

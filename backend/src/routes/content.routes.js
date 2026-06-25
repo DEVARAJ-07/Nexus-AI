@@ -2,19 +2,38 @@ const express = require("express");
 const router = express.Router();
 const prisma = require("../config/db");
 
-// Mock Brand Voice Profile
 let brandVoice = {
   tone: ["Technical", "Direct", "Structured"],
   vocabulary: ["monorepo", "cache-miss", "diagnostics", "pipeline"],
   styleProfile: "Structured category sections (Features, Fixes, Deployments) with code blocks."
 };
 
-// Mock Content List
 let contentPieces = [
   { id: "c-1", type: "release_notes", title: "Release Notes v1.2.0-beta", body: "<h1>Release Notes</h1><p>Core JWT endpoints added, connection pools patched.</p>", status: "PUBLISHED", scheduledAt: null },
   { id: "c-2", type: "changelog", title: "Changelog updates for database scripts", body: "<p>Initial prisma migrations verified.</p>", status: "DRAFT", scheduledAt: null }
 ];
 
+async function getWorkspaceId(req) {
+  const headerWorkspaceId = req.headers["x-workspace-id"];
+  if (headerWorkspaceId) return headerWorkspaceId;
+
+  try {
+    let ws = await prisma.workspace.findFirst();
+    if (!ws) {
+      ws = await prisma.workspace.create({
+        data: {
+          name: "Default Workspace",
+          plan: "FREE",
+        },
+      });
+    }
+    return ws.id;
+  } catch (err) {
+    return "default-workspace-id";
+  }
+}
+
+// Generate endpoint (streams tokens using SSE)
 router.post("/generate", (req, res) => {
   const { type, topic, tone } = req.body;
   res.setHeader("Content-Type", "text/event-stream");
@@ -41,11 +60,16 @@ router.post("/generate", (req, res) => {
   });
 });
 
+// Fetch all content pieces
 router.get("/", async (req, res) => {
   try {
-    const dbPieces = await prisma.contentPiece.findMany();
-    if (dbPieces.length > 0) {
-      return res.status(200).json(dbPieces);
+    const workspaceId = await getWorkspaceId(req);
+    const items = await prisma.contentPiece.findMany({
+      where: { workspaceId },
+    });
+
+    if (items.length > 0) {
+      return res.status(200).json(items);
     }
     res.status(200).json(contentPieces);
   } catch (err) {
@@ -54,10 +78,13 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Fetch single content piece
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const piece = await prisma.contentPiece.findUnique({ where: { id } });
+    const piece = await prisma.contentPiece.findUnique({
+      where: { id },
+    });
     if (piece) {
       return res.status(200).json(piece);
     }
@@ -72,6 +99,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// Update content piece
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const { title, body, status } = req.body;
@@ -100,7 +128,7 @@ router.patch("/:id", async (req, res) => {
     };
     res.status(200).json(contentPieces[index]);
   } catch (err) {
-    console.warn("[DB_FALLBACK] patch content/:id failed, using mock:", err.message);
+    console.warn("[DB_FALLBACK] patch content failed, using mock:", err.message);
     const index = contentPieces.findIndex(c => c.id === id);
     if (index === -1) return res.status(404).json({ error: "Content not found" });
     contentPieces[index] = {
@@ -113,6 +141,7 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
+// Delete content piece
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -129,6 +158,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// Schedule content piece
 router.patch("/:id/schedule", async (req, res) => {
   const { id } = req.params;
   const { date } = req.body;
@@ -138,7 +168,7 @@ router.patch("/:id/schedule", async (req, res) => {
       const updated = await prisma.contentPiece.update({
         where: { id },
         data: {
-          scheduledAt: new Date(date),
+          scheduledAt: date ? new Date(date) : null,
           status: "SCHEDULED"
         }
       });
@@ -161,27 +191,54 @@ router.patch("/:id/schedule", async (req, res) => {
   }
 });
 
-router.post("/brand-voice/analyze", (req, res) => {
-  const { examples } = req.body;
-  res.status(200).json({
-    message: "Brand Voice profile generated from input examples",
-    brandVoice: {
+// Analyze brand voice examples
+router.post("/brand-voice/analyze", async (req, res) => {
+  try {
+    const { examples } = req.body;
+    const workspaceId = await getWorkspaceId(req);
+    
+    const brandVoiceData = {
       tone: ["Bold", "Technical"],
       vocabulary: ["monorepo", "workspaces", "fast-builds"],
-      styleProfile: "Clear, bold sentence structures utilizing list groups."
-    }
-  });
+      styleProfile: "Clear, bold sentence structures utilizing list groups.",
+    };
+
+    const brandVoiceRecord = await prisma.brandVoice.upsert({
+      where: { workspaceId },
+      update: brandVoiceData,
+      create: {
+        ...brandVoiceData,
+        workspaceId,
+      },
+    });
+
+    res.status(200).json({
+      message: "Brand Voice profile generated from input examples",
+      brandVoice: brandVoiceRecord,
+    });
+  } catch (error) {
+    console.warn("[DB_FALLBACK] analyze brand voice failed, returning mock:", error.message);
+    res.status(200).json({
+      message: "Brand Voice profile generated from input examples",
+      brandVoice: {
+        tone: ["Bold", "Technical"],
+        vocabulary: ["monorepo", "workspaces", "fast-builds"],
+        styleProfile: "Clear, bold sentence structures utilizing list groups."
+      }
+    });
+  }
 });
 
+// Fetch brand voice
 router.get("/brand-voice", async (req, res) => {
   try {
-    const bv = await prisma.brandVoice.findFirst();
-    if (bv) {
-      return res.status(200).json({
-        tone: bv.tone,
-        vocabulary: bv.vocabulary,
-        styleProfile: bv.styleProfile
-      });
+    const workspaceId = await getWorkspaceId(req);
+    let voice = await prisma.brandVoice.findUnique({
+      where: { workspaceId },
+    });
+
+    if (voice) {
+      return res.status(200).json(voice);
     }
     res.status(200).json(brandVoice);
   } catch (err) {

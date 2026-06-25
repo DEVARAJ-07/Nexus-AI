@@ -71,7 +71,7 @@ export default function Home() {
           </div>
 
           {/* Block 1: API Server */}
-          <div className="ascii-box">
+          <div className="ascii-box" style={{ width: "380px" }}>
             <div className="corner-dot tl">+</div>
             <div className="corner-dot tr">+</div>
             <div className="corner-dot bl">+</div>
@@ -86,7 +86,7 @@ export default function Home() {
           <div style={{ fontFamily: "monospace", fontSize: "0.75rem", textAlign: "center", margin: "0.5rem 0" }}>
             <div style={{ color: "var(--text-secondary)" }}>(Async SQS/Redis Queue Dispatch)</div>
             <div style={{ borderLeft: "1px dotted var(--border-color)", height: "25px", margin: "0.25rem auto" }}></div>
-            <div style={{ marginTop: "-3px" }}>v</div>
+            <div style={{ fontSize: "0.75rem", marginTop: "-3px" }}>v</div>
           </div>
 
           {/* Block 2: Worker Engine */}
@@ -144,10 +144,17 @@ export default function Home() {
               </div>
             </div>
             
+            {/* Perfectly centered parallel connections */}
             <div style={{ display: "flex", justifyContent: "space-between", margin: "0.25rem 0" }}>
-              <div style={{ borderLeft: "1px dotted var(--border-color)", height: "15px", marginLeft: "15%" }}></div>
-              <div style={{ borderLeft: "1px dotted var(--border-color)", height: "15px", margin: "0 auto" }}></div>
-              <div style={{ borderLeft: "1px dotted var(--border-color)", height: "15px", marginRight: "15%" }}></div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                <div style={{ borderLeft: "1px dotted var(--border-color)", height: "15px" }}></div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                <div style={{ borderLeft: "1px dotted var(--border-color)", height: "15px" }}></div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+                <div style={{ borderLeft: "1px dotted var(--border-color)", height: "15px" }}></div>
+              </div>
             </div>
             
             {/* Parallel Target Evaluation */}
@@ -176,10 +183,20 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Connection */}
-          <div style={{ fontFamily: "monospace", fontSize: "0.75rem", textAlign: "center", margin: "0.5rem 0" }}>
-            <div style={{ borderLeft: "1px dotted var(--border-color)", height: "25px", margin: "0.25rem auto" }}></div>
-            <div style={{ marginTop: "-3px" }}>v</div>
+          {/* Three-column connecting lines mapping targets to final outputs */}
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "0 2.5rem", margin: "0.5rem 0" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+              <div style={{ borderLeft: "1px dotted var(--border-color)", height: "25px" }}></div>
+              <div style={{ fontSize: "0.75rem", marginTop: "-3px", fontFamily: "monospace" }}>v</div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+              <div style={{ borderLeft: "1px dotted var(--border-color)", height: "25px" }}></div>
+              <div style={{ fontSize: "0.75rem", marginTop: "-3px", fontFamily: "monospace" }}>v</div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+              <div style={{ borderLeft: "1px dotted var(--border-color)", height: "25px" }}></div>
+              <div style={{ fontSize: "0.75rem", marginTop: "-3px", fontFamily: "monospace" }}>v</div>
+            </div>
           </div>
 
           {/* Target Outputs */}
