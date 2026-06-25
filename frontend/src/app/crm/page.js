@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { FolderPlus, Award, Play, X, Check, Activity, ShieldAlert, Loader2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { FolderPlus, Play, X, ShieldAlert, Loader2, Activity } from "lucide-react";
 
 export default function CRM() {
   const [repositories, setRepositories] = useState([
@@ -27,55 +27,118 @@ export default function CRM() {
     { id: "PRODUCTION", name: "Production (Live)" }
   ];
 
+  // Fetch initial repositories from Express API
+  useEffect(() => {
+    async function loadRepos() {
+      try {
+        const res = await fetch("http://localhost:5000/api/crm/contacts");
+        if (res.ok) {
+          const data = await res.json();
+          setRepositories(data);
+        }
+      } catch (err) {
+        console.log("Failed to load repositories from server, using local defaults:", err.message);
+      }
+    }
+    loadRepos();
+  }, []);
+
   const getReposInStage = (stageId) => {
     return repositories.filter((r) => r.stage === stageId);
   };
 
-  // Move repo stage
-  const moveStage = (id, newStage) => {
+  // Move repo stage via backend PATCH
+  const moveStage = async (id, newStage) => {
+    // Optimistically update UI
     setRepositories((prev) =>
       prev.map((r) => (r.id === id ? { ...r, stage: newStage } : r))
     );
+
+    try {
+      await fetch(`http://localhost:5000/api/crm/contacts/${id}/stage`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: newStage })
+      });
+    } catch (err) {
+      console.log("Failed to update stage on backend:", err.message);
+    }
   };
 
-  // Feature 1: Live AI Pipeline Scan
+  // Run AI Pipeline scan (can trigger simulated score updates)
   const runPipelineScan = () => {
     if (isScanning) return;
     setIsScanning(true);
     setScanMessage("Scanning repositories for security vulnerabilities & lint warnings...");
     
-    setTimeout(() => {
-      setRepositories((prev) =>
-        prev.map((r) => {
-          // Adjust health scores slightly, keeping them bounded
-          const newHealth = Math.min(100, Math.max(20, r.health + Math.floor(Math.random() * 16) - 8));
-          return { ...r, health: newHealth };
-        })
-      );
+    setTimeout(async () => {
+      // Create new randomized score offsets
+      const updatedList = repositories.map((r) => {
+        const newHealth = Math.min(100, Math.max(20, r.health + Math.floor(Math.random() * 16) - 8));
+        return { ...r, health: newHealth };
+      });
+      setRepositories(updatedList);
+
+      // Sync new health scores back to backend
+      for (const r of updatedList) {
+        try {
+          await fetch(`http://localhost:5000/api/crm/contacts/${r.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ health: r.health })
+          });
+        } catch (_) {}
+      }
+
       setIsScanning(false);
       setScanMessage("AI Scan complete! Anomaly alert triggered on low-health branch 'nexus-data-pipeline'.");
     }, 1500);
   };
 
-  // Feature 2: Add dynamic repository
-  const handleAddRepo = (e) => {
+  // Add dynamic repository via backend POST
+  const handleAddRepo = async (e) => {
     e.preventDefault();
     if (!newRepoName || !newBranch) return;
 
-    const newRepo = {
+    const healthVal = Math.floor(Math.random() * 30) + 70;
+    const tempRepo = {
       id: `repo-${Date.now()}`,
       name: newRepoName,
       branch: newBranch,
       stage: newStage,
-      health: Math.floor(Math.random() * 30) + 70 // starting health 70% to 100%
+      health: healthVal
     };
 
-    setRepositories((prev) => [...prev, newRepo]);
-    setNewRepoName("");
-    setNewBranch("");
-    setNewStage("DEV");
-    setShowAddForm(false);
+    try {
+      const res = await fetch("http://localhost:5000/api/crm/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newRepoName,
+          branch: newBranch,
+          stage: newStage
+        })
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setRepositories((prev) => [...prev, saved]);
+      } else {
+        throw new Error("Failed to save repo");
+      }
+    } catch (err) {
+      console.log("Failed to register repository branch on backend, using fallback:", err.message);
+      setRepositories((prev) => [...prev, tempRepo]);
+    } finally {
+      setNewRepoName("");
+      setNewBranch("");
+      setNewStage("DEV");
+      setShowAddForm(false);
+    }
   };
+
+  const averageHealth = repositories.length > 0
+    ? Math.round(repositories.reduce((acc, r) => acc + r.health, 0) / repositories.length)
+    : 0;
 
   return (
     <div style={{ position: "relative" }}>
@@ -218,7 +281,7 @@ export default function CRM() {
         <div style={{ border: "1px solid var(--border-color)", padding: "1rem", backgroundColor: "var(--color-off-white)" }}>
           <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>AVERAGE HEALTH</div>
           <div style={{ fontSize: "1.5rem", fontWeight: 800 }}>
-            {Math.round(repositories.reduce((acc, r) => acc + r.health, 0) / repositories.length)}%
+            {averageHealth}%
           </div>
         </div>
       </div>
