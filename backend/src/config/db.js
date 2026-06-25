@@ -15,7 +15,12 @@ if (process.env.NODE_ENV === "production") {
   // Prevent multiple instances of Prisma Client in development due to hot reloading
   if (!global.prisma) {
     global.prisma = new PrismaClient({
-      log: ["query", "info", "warn", "error"],
+      log: ["info", "warn", "error"],
+      datasources: {
+        db: {
+          url: env.DATABASE_URL,
+        },
+      },
     });
   }
   prisma = global.prisma;
