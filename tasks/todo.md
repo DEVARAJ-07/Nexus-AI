@@ -8,12 +8,12 @@ This file serves as the workspace's master list of daily tasks and progress trac
 
 - [ ] **Environment Variables Setup**
   - [ ] Create `.env` in `backend/` and `frontend/` matching specifications
-  - [ ] Configure `DATABASE_URL` (Supabase Postgres)
+  - [x] Configure `DATABASE_URL` (Supabase Postgres)
   - [ ] Configure API keys: `CLAUDE_API_KEY`, `OPENAI_API_KEY`, `RESEND_API_KEY`
 - [ ] **Database Setup & Migrations**
   - [ ] Verify Prisma Schema models
-  - [ ] Run initial migrations or push schema using `npm run db:push`
-  - [ ] Set up a workspace seed script for demo user/workspace records
+  - [x] Run initial migrations or push schema using `npm run db:push`
+  - [x] Set up a workspace seed script for demo user/workspace records
   - [ ] Establish Row Level Security (RLS) policies on database level
   - [ ] Verify database indexes on foreign keys and frequently searched fields
 - [ ] **Security Checks**
@@ -70,8 +70,8 @@ This file serves as the workspace's master list of daily tasks and progress trac
 ## 🎯 4. MODULE 3 — PIPELINE KANBAN & REPOSITORIES (LEAD CRM)
 
 - [ ] **Interactive Kanban Boards**
-  - [ ] Set up drag-and-drop Kanban view of pipeline stages (DEV to PRODUCTION)
-  - [ ] Connect stage changes to active database mutations
+  - [x] Set up drag-and-drop Kanban view of pipeline stages (DEV to PRODUCTION)
+  - [x] Connect stage changes to active database mutations
   - [ ] Add duration tracking per pipeline stage
 - [ ] **AI Diagnostics & Health Scores**
   - [ ] Implement Claude-powered pipeline health scoring API
@@ -105,14 +105,14 @@ This file serves as the workspace's master list of daily tasks and progress trac
   - [ ] Integrate BullMQ queue system to schedule and execute steps
   - [ ] Build action adapters (Slack alerts, deploy triggers, email notifications)
 - [ ] **Execution Logs**
-  - [ ] Implement step-by-step execution tracer and rerun trigger buttons
+  - [x] Implement step-by-step execution tracer and rerun trigger buttons
 
 ---
 
 ## 🔌 7. MODULE 6 — DEVOPS INTEGRATIONS (CONNECT HUB)
 
 - [ ] **Integration Marketplace**
-  - [ ] Set up OAuth handlers (Google, Slack, GitHub)
+  - [x] Set up OAuth handlers (Google, Slack, GitHub)
   - [ ] Secure token storage using environment encryption
 - [ ] **API Keys & Webhooks**
   - [ ] Build API Key generator and bcrypt hashing check middleware
