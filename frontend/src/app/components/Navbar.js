@@ -1,7 +1,8 @@
 "use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   Brain,
@@ -12,14 +13,17 @@ import {
   Network,
   Settings as SettingsIcon,
   LayoutDashboard,
-  Terminal as TerminalIcon
+  Terminal as TerminalIcon,
+  LogOut,
+  ChevronUp
 } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const navItems = [
-    { href: "/", label: "HOME", icon: Home },
     { href: "/dashboard", label: "DASHBOARD", icon: LayoutDashboard },
     { href: "/intelligence", label: "LOG INTELLIGENCE", icon: Brain },
     { href: "/content", label: "RELEASE STUDIO", icon: FileText },
@@ -29,6 +33,12 @@ export default function Navbar() {
     { href: "/integrations", label: "INTEGRATIONS", icon: Network },
     { href: "/settings", label: "SETTINGS", icon: SettingsIcon },
   ];
+
+  const handleLogout = () => {
+    localStorage.setItem("nexus_auth", "false");
+    window.dispatchEvent(new Event("nexus-auth-change"));
+    router.replace("/");
+  };
 
   return (
     <aside className="sidebar">
@@ -54,10 +64,77 @@ export default function Navbar() {
         })}
       </nav>
 
-      <div className="sidebar-footer">
-        <strong>SYSTEM: ONLINE</strong>
-        <div style={{ fontSize: "0.65rem", marginTop: "0.25rem", color: "var(--color-steel)" }}>
-          API: localhost:5000
+      {/* User Profile Footer section */}
+      <div style={{ position: "relative", marginTop: "auto", borderTop: "1px solid var(--border-color)", paddingTop: "1rem" }}>
+        {showProfileMenu && (
+          <div style={{
+            position: "absolute",
+            bottom: "calc(100% + 8px)",
+            left: "0",
+            width: "100%",
+            backgroundColor: "var(--color-off-white)",
+            border: "1px solid var(--border-color)",
+            padding: "0.4rem",
+            boxShadow: "4px 4px 0px var(--border-color)",
+            zIndex: 110,
+            display: "flex",
+            flexDirection: "column"
+          }}>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "monospace",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                padding: "0.6rem 0.8rem",
+                color: "var(--color-failed)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                transition: "background 0.2s"
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = "var(--color-warm-grey)"}
+              onMouseLeave={(e) => e.target.style.backgroundColor = "transparent"}
+            >
+              <LogOut size={12} />
+              <span>LOGOUT ACCOUNT</span>
+            </button>
+          </div>
+        )}
+        
+        <div 
+          onClick={() => setShowProfileMenu(!showProfileMenu)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: "pointer",
+            padding: "0.5rem",
+            border: "1px solid var(--border-color)",
+            backgroundColor: "var(--color-off-white)",
+            transition: "all 0.15s ease"
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.boxShadow = "2px 2px 0px var(--border-color)"}
+          onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <img 
+              src="https://supabase-storage.com/avatars/john.jpg" 
+              onError={(e) => { e.target.src = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"; }}
+              style={{ width: "26px", height: "26px", borderRadius: "50%", border: "1px solid var(--border-color)" }}
+              alt="User Avatar"
+            />
+            <div style={{ display: "flex", flexDirection: "column", maxWidth: "120px" }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>John Doe</span>
+              <span style={{ fontSize: "0.55rem", color: "var(--text-secondary)", fontFamily: "monospace" }}>ADMINISTRATOR</span>
+            </div>
+          </div>
+          <ChevronUp size={14} style={{ color: "var(--text-secondary)", transform: showProfileMenu ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
         </div>
       </div>
     </aside>

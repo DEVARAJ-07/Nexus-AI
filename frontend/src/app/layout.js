@@ -1,7 +1,6 @@
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import Navbar from "./components/Navbar";
-import TransitionProvider from "./components/TransitionProvider";
+import ClientAppShell from "./components/ClientAppShell";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -18,18 +17,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={plusJakartaSans.variable}>
       <body>
-        <div className="app-shell">
-          <Navbar />
-          <div className="main-area">
-            <header className="topbar">
-              <div className="topbar-title">Nexus AI Command Center</div>
-              <div className="topbar-meta">V.0.1</div>
-            </header>
-            <main className="content-container">
-              <TransitionProvider>{children}</TransitionProvider>
-            </main>
-          </div>
-        </div>
+        <ClientAppShell>{children}</ClientAppShell>
       </body>
     </html>
   );
