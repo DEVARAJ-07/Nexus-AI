@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../config/db");
+const axios = require("axios");
 
 // Helper to get or create a workspace
 async function getWorkspaceId(req) {
@@ -280,12 +281,49 @@ router.post("/webhooks", async (req, res) => {
   }
 });
 
-router.post("/webhooks/:id/test", (req, res) => {
-  res.status(200).json({
-    status: "SUCCESS",
-    statusCode: 200,
-    responseBody: "{\"received\": true}",
-  });
+router.post("/webhooks/:id/test", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const webhook = await prisma.webhook.findUnique({
+      where: { id },
+    });
+
+    if (!webhook) {
+      return res.status(404).json({ error: "Webhook configuration not found" });
+    }
+
+    const testPayload = {
+      event: "test.ping",
+      timestamp: new Date().toISOString(),
+      workspaceId: webhook.workspaceId,
+      message: "This is a diagnostic test event from Nexus AI.",
+    };
+
+    try {
+      const response = await axios.post(webhook.url, testPayload, {
+        timeout: 4000,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Nexus-Signature": "test_signature_hash",
+        },
+      });
+
+      res.status(200).json({
+        status: "SUCCESS",
+        statusCode: response.status,
+        responseBody: typeof response.data === "string" ? response.data : JSON.stringify(response.data),
+      });
+    } catch (requestError) {
+      res.status(200).json({
+        status: "FAILED",
+        statusCode: requestError.response?.status || 500,
+        responseBody: requestError.message,
+      });
+    }
+  } catch (error) {
+    console.error("Test webhook error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

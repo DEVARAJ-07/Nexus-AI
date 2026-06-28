@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../config/db");
+const env = require("../config/env");
+const axios = require("axios");
 
 // Helper to get or create a workspace
 async function getWorkspaceId(req) {
@@ -19,8 +21,8 @@ async function getWorkspaceId(req) {
   return ws.id;
 }
 
-// SSE Stream mock for Claude AI Chat
-router.get("/chat-stream", (req, res) => {
+// SSE Stream for Claude AI Chat
+router.get("/chat-stream", async (req, res) => {
   const message = req.query.message || "Hello";
   
   res.setHeader("Content-Type", "text/event-stream");
@@ -28,31 +30,120 @@ router.get("/chat-stream", (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders(); // Establish stream
 
-  const tokens = [
-    "This", " ", "is", " ", "an", " ", "AI-generated", " ", "response", " ",
-    "from", " ", "Claude", " ", "3.5", " ", "Sonnet,", " ", "processed", " ",
-    "by", " ", "the", " ", "Log", " ", "Intelligence", " ", "engine.", " ",
-    "I", " ", "can", " ", "readily", " ", "diagnose", " ", "pipeline", " ",
-    "failures,", " ", "analyze", " ", "build", " ", "logs,", " ", "and", " ",
-    "generate", " ", "code", " ", "patches."
-  ];
+  try {
+    const workspaceId = await getWorkspaceId(req);
+    const docs = await prisma.document.findMany({
+      where: { workspaceId },
+      take: 5,
+    });
+    const knowledge = await prisma.knowledgeItem.findMany({
+      where: { workspaceId },
+      take: 5,
+    });
 
-  let currentToken = 0;
-  const interval = setInterval(() => {
-    if (currentToken < tokens.length) {
-      res.write(`data: ${JSON.stringify({ token: tokens[currentToken] })}\n\n`);
-      currentToken++;
-    } else {
-      res.write("data: [DONE]\n\n");
+    const systemPrompt = `You are Nexus AI, an advanced developer pipeline intelligence engine.
+Workspace ID: ${workspaceId}
+
+Current Scanned Workspace Documents:
+${docs.map(d => `- ${d.name} (${d.fileUrl})`).join("\n")}
+
+Knowledge Base Items:
+${knowledge.map(k => `- [${k.title}]: ${k.content}`).join("\n")}
+
+Acknowledge this context if queried. Answer all diagnostic, code pipeline, and log questions directly and with code blocks.`;
+
+    const isMockKey = !env.CLAUDE_API_KEY || env.CLAUDE_API_KEY === "claude_mock_api_key_4082" || env.CLAUDE_API_KEY.includes("mock");
+
+    if (!isMockKey) {
+      try {
+        const response = await axios({
+          method: "post",
+          url: "https://api.anthropic.com/v1/messages",
+          headers: {
+            "x-api-key": env.CLAUDE_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          data: {
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [{ role: "user", content: message }],
+            stream: true,
+          },
+          responseType: "stream",
+        });
+
+        let buffer = "";
+        response.data.on("data", chunk => {
+          buffer += chunk.toString();
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (cleanLine.startsWith("data:")) {
+              try {
+                const jsonStr = cleanLine.substring(5).trim();
+                if (jsonStr === "[DONE]") continue;
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.type === "content_block_delta" && parsed.delta && parsed.delta.text) {
+                  res.write(`data: ${JSON.stringify({ token: parsed.delta.text })}\n\n`);
+                }
+              } catch (e) {
+                // Incomplete chunk parse error - skip
+              }
+            }
+          }
+        });
+
+        response.data.on("end", () => {
+          res.write("data: [DONE]\n\n");
+          res.end();
+        });
+
+        req.on("close", () => {
+          if (response.data.destroy) response.data.destroy();
+        });
+        return;
+      } catch (apiError) {
+        console.error("Claude API call failed, falling back to mock streaming:", apiError.message);
+      }
+    }
+
+    // Fallback streaming for development/mock mode
+    const tokens = [
+      "Hello! ", "This ", "is ", "Nexus AI. ", "\n\n",
+      "[Dev Mode: Fallback Stream]\n",
+      "I ", "detected ", "your ", "workspace ", "context. ",
+      `Currently tracking workspace "${workspaceId}" with ${docs.length} documents. `,
+      "\n\nHere is a diagnostic sample analysis based on your query: '", message, "'.\n",
+      "Ensure a valid `CLAUDE_API_KEY` is configured in `backend/.env` for real-time Sonnet integration."
+    ];
+
+    let currentToken = 0;
+    const interval = setInterval(() => {
+      if (currentToken < tokens.length) {
+        res.write(`data: ${JSON.stringify({ token: tokens[currentToken] })}\n\n`);
+        currentToken++;
+      } else {
+        res.write("data: [DONE]\n\n");
+        clearInterval(interval);
+        res.end();
+      }
+    }, 50);
+
+    req.on("close", () => {
       clearInterval(interval);
       res.end();
-    }
-  }, 80);
+    });
 
-  req.on("close", () => {
-    clearInterval(interval);
+  } catch (error) {
+    console.error("Chat stream root error:", error);
+    res.write(`data: ${JSON.stringify({ token: "\nError establishing connection." })}\n\n`);
+    res.write("data: [DONE]\n\n");
     res.end();
-  });
+  }
 });
 
 router.post("/research", (req, res) => {

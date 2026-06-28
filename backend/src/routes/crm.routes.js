@@ -234,11 +234,57 @@ router.get("/companies", async (req, res) => {
   }
 });
 
-router.post("/import", (req, res) => {
-  res.status(200).json({
-    message: "Repositories imported successfully",
-    count: 2,
-  });
+router.post("/import", async (req, res) => {
+  try {
+    const workspaceId = await getWorkspaceId(req);
+    const { repositories } = req.body;
+    let count = 0;
+
+    if (Array.isArray(repositories)) {
+      for (const repo of repositories) {
+        const existing = await prisma.contact.findFirst({
+          where: { name: repo.name, workspaceId },
+        });
+
+        if (existing) {
+          await prisma.contact.update({
+            where: { id: existing.id },
+            data: {
+              source: repo.branch || repo.source || "main",
+              stage: repo.stage || "DEV",
+              score: repo.health || repo.score || 85,
+            },
+          });
+        } else {
+          await prisma.contact.create({
+            data: {
+              name: repo.name,
+              email: `${repo.name.toLowerCase()}@repo.nexus.ai`,
+              source: repo.branch || repo.source || "main",
+              stage: repo.stage || "DEV",
+              score: repo.health || repo.score || 85,
+              workspaceId,
+            },
+          });
+        }
+        count++;
+      }
+    } else {
+      // Default seed behavior if no repository list is passed
+      const beforeCount = await prisma.contact.count({ where: { workspaceId } });
+      await seedDefaultRepositories(workspaceId);
+      const afterCount = await prisma.contact.count({ where: { workspaceId } });
+      count = afterCount - beforeCount;
+    }
+
+    res.status(200).json({
+      message: "Repositories imported successfully",
+      count,
+    });
+  } catch (error) {
+    console.error("Import error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/score-report", async (req, res) => {
