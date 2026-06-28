@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { CreditCard, Users, Trash2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { CreditCard, Users, Trash2, Save, Check } from "lucide-react";
 
 export default function Settings() {
   const [profileName, setProfileName] = useState("John Doe");
@@ -15,21 +15,128 @@ export default function Settings() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("MEMBER");
 
-  const handleInvite = (e) => {
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savedProfile, setSavedProfile] = useState(false);
+  const [savingOrg, setSavingOrg] = useState(false);
+  const [savedOrg, setSavedOrg] = useState(false);
+
+  // Fetch initial configuration on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const profileRes = await fetch("http://localhost:5000/api/settings/profile");
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setProfileName(profileData.name || "John Doe");
+          setProfileEmail(profileData.email || "john@nexus-ci.com");
+        }
+
+        const wsRes = await fetch("http://localhost:5000/api/settings/workspace");
+        if (wsRes.ok) {
+          const wsData = await wsRes.json();
+          setOrgName(wsData.name || "Nexus Headquarters");
+        }
+
+        const teamRes = await fetch("http://localhost:5000/api/settings/team");
+        if (teamRes.ok) {
+          const teamData = await teamRes.json();
+          setTeam(teamData);
+        }
+      } catch (err) {
+        console.log("Failed to load settings from server, using local defaults:", err.message);
+      }
+    }
+
+    loadData();
+  }, []);
+
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!inviteEmail) return;
-    const newMember = {
-      id: `u-${Date.now()}`,
-      name: inviteEmail.split("@")[0],
-      email: inviteEmail,
-      role: inviteRole
-    };
-    setTeam((prev) => [...prev, newMember]);
-    setInviteEmail("");
+    setSavingProfile(true);
+    setSavedProfile(false);
+    try {
+      const res = await fetch("http://localhost:5000/api/settings/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: profileName, email: profileEmail })
+      });
+      if (res.ok) {
+        setSavedProfile(true);
+        setTimeout(() => setSavedProfile(false), 2000);
+      }
+    } catch (err) {
+      console.log("Failed to save profile:", err.message);
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
-  const handleRevoke = (id) => {
-    setTeam((prev) => prev.filter((m) => m.id !== id));
+  const handleSaveWorkspace = async (e) => {
+    e.preventDefault();
+    setSavingOrg(true);
+    setSavedOrg(false);
+    try {
+      const res = await fetch("http://localhost:5000/api/settings/workspace", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: orgName })
+      });
+      if (res.ok) {
+        setSavedOrg(true);
+        setTimeout(() => setSavedOrg(false), 2000);
+      }
+    } catch (err) {
+      console.log("Failed to save workspace:", err.message);
+    } finally {
+      setSavingOrg(false);
+    }
+  };
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+
+    try {
+      const res = await fetch("http://localhost:5000/api/settings/team/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTeam((prev) => [...prev, data.member]);
+        setInviteEmail("");
+      } else {
+        throw new Error("Invite failed");
+      }
+    } catch (err) {
+      console.log("Failed to send invite, using local fallback:", err.message);
+      // Fallback
+      const newMember = {
+        id: `u-${Date.now()}`,
+        name: inviteEmail.split("@")[0],
+        email: inviteEmail,
+        role: inviteRole
+      };
+      setTeam((prev) => [...prev, newMember]);
+      setInviteEmail("");
+    }
+  };
+
+  const handleRevoke = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/settings/team/${id}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setTeam((prev) => prev.filter((m) => m.id !== id));
+      } else {
+        throw new Error("Revoke failed");
+      }
+    } catch (err) {
+      console.log("Failed to revoke access, using local fallback:", err.message);
+      setTeam((prev) => prev.filter((m) => m.id !== id));
+    }
   };
 
   return (
@@ -41,7 +148,7 @@ export default function Settings() {
           <h3 style={{ fontFamily: "monospace", fontSize: "0.9rem", textTransform: "uppercase", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}>
             Workspace Settings
           </h3>
-          <form style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>PROFILE NAME</label>
               <input
@@ -62,6 +169,21 @@ export default function Settings() {
               />
             </div>
 
+            <button type="submit" className="brutalist-button" style={{ display: "flex", gap: "0.25rem", width: "100%", justifyContent: "center" }} disabled={savingProfile}>
+              {savedProfile ? (
+                <>
+                  <Check size={14} /> Profile Saved
+                </>
+              ) : (
+                <>
+                  <Save size={14} /> Save Profile Settings
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Org / Workspace Settings */}
+          <form onSubmit={handleSaveWorkspace} style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1.5rem" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <label style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>ORGANIZATION NAME</label>
               <input
@@ -71,6 +193,18 @@ export default function Settings() {
                 className="brutalist-input"
               />
             </div>
+
+            <button type="submit" className="brutalist-button" style={{ display: "flex", gap: "0.25rem", width: "100%", justifyContent: "center" }} disabled={savingOrg}>
+              {savedOrg ? (
+                <>
+                  <Check size={14} /> Organization Saved
+                </>
+              ) : (
+                <>
+                  <Save size={14} /> Save Organization Name
+                </>
+              )}
+            </button>
           </form>
         </div>
 
