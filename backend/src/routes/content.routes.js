@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../config/db");
+const env = require("../config/env");
+const axios = require("axios");
 
 let brandVoice = {
   tone: ["Technical", "Direct", "Structured"],
@@ -34,30 +36,115 @@ async function getWorkspaceId(req) {
 }
 
 // Generate endpoint (streams tokens using SSE)
-router.post("/generate", (req, res) => {
+router.post("/generate", async (req, res) => {
   const { type, topic, tone } = req.body;
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Connection-Empty-Action", "keep-alive");
 
-  const streamText = `<h1>Release Notes</h1><p>Generated under ${tone || "Technical"} format for commits: <em>${topic}</em>.</p><p>Nexus AI successfully compiled release details and repository build changelogs.</p>`;
-  const words = streamText.split(" ");
-  let idx = 0;
+  try {
+    const workspaceId = await getWorkspaceId(req);
+    const voice = await prisma.brandVoice.findUnique({
+      where: { workspaceId },
+    });
 
-  const interval = setInterval(() => {
-    if (idx < words.length) {
-      res.write(`data: ${JSON.stringify({ token: words[idx] + " " })}\n\n`);
-      idx++;
-    } else {
-      res.write("data: [DONE]\n\n");
-      clearInterval(interval);
-      res.end();
+    const systemPrompt = `You are a professional technical writer and devops release manager.
+Generate documentation of type "${type || "release_notes"}" in HTML format.
+Tone: ${tone || "Technical"}.
+${voice ? `Brand Guidelines:
+- Style Profile: ${voice.styleProfile}
+- Tone attributes: ${voice.tone.join(", ")}
+- Allowed vocab: ${voice.vocabulary.join(", ")}` : ""}
+
+Only return HTML elements (e.g., <h1>, <p>, <ul>, <li>, <em>, <strong>, <pre><code>). Do not wrap with markdown code blocks (e.g., \`\`\`html).`;
+
+    const userPrompt = `Generate release details based on the following topic or commit logs: "${topic}".`;
+
+    const isMockKey = !env.CLAUDE_API_KEY || env.CLAUDE_API_KEY === "claude_mock_api_key_4082" || env.CLAUDE_API_KEY.includes("mock");
+
+    if (!isMockKey) {
+      try {
+        const response = await axios({
+          method: "post",
+          url: "https://api.anthropic.com/v1/messages",
+          headers: {
+            "x-api-key": env.CLAUDE_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          data: {
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 1536,
+            system: systemPrompt,
+            messages: [{ role: "user", content: userPrompt }],
+            stream: true,
+          },
+          responseType: "stream",
+        });
+
+        let buffer = "";
+        response.data.on("data", chunk => {
+          buffer += chunk.toString();
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (cleanLine.startsWith("data:")) {
+              try {
+                const jsonStr = cleanLine.substring(5).trim();
+                if (jsonStr === "[DONE]") continue;
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.type === "content_block_delta" && parsed.delta && parsed.delta.text) {
+                  res.write(`data: ${JSON.stringify({ token: parsed.delta.text })}\n\n`);
+                }
+              } catch (e) {
+                // Incomplete chunk - ignore parse error
+              }
+            }
+          }
+        });
+
+        response.data.on("end", () => {
+          res.write("data: [DONE]\n\n");
+          res.end();
+        });
+
+        req.on("close", () => {
+          if (response.data.destroy) response.data.destroy();
+        });
+        return;
+      } catch (apiError) {
+        console.error("Content generation Claude API call failed, falling back:", apiError.message);
+      }
     }
-  }, 50);
 
-  req.on("close", () => {
-    clearInterval(interval);
-  });
+    // Fallback stream generator
+    const streamText = `<h1>Release Notes</h1><p>Generated under ${tone || "Technical"} format for commits: <em>${topic}</em>.</p><p>Nexus AI successfully compiled release details and repository build changelogs using fallback generation. To run with Claude, set a valid \`CLAUDE_API_KEY\` in \`backend/.env\`.</p>`;
+    const words = streamText.split(" ");
+    let idx = 0;
+
+    const interval = setInterval(() => {
+      if (idx < words.length) {
+        res.write(`data: ${JSON.stringify({ token: words[idx] + " " })}\n\n`);
+        idx++;
+      } else {
+        res.write("data: [DONE]\n\n");
+        clearInterval(interval);
+        res.end();
+      }
+    }, 40);
+
+    req.on("close", () => {
+      clearInterval(interval);
+    });
+
+  } catch (error) {
+    console.error("Content generate stream error:", error);
+    res.write(`data: ${JSON.stringify({ token: "<p>Error generating stream content.</p>" })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+  }
 });
 
 // Fetch all content pieces
