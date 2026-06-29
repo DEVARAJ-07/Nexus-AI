@@ -2,129 +2,159 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldAlert, Terminal } from "lucide-react";
+import { Loader2, Terminal, Cpu, Sparkles, Network } from "lucide-react";
 import { API_URL } from "../../config";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [status, setStatus] = useState("Synchronizing profile to database...");
+  const [status, setStatus] = useState("Verifying credentials...");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash;
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get("code");
+    if (typeof window === "undefined") return;
 
-      // Scenario A: Supabase OAuth redirect (returns tokens in hash fragment '#')
-      if (hash) {
-        const params = new URLSearchParams(hash.replace("#", "?"));
-        const supabaseToken = params.get("access_token");
-        const githubToken = params.get("provider_token");
+    const hash = window.location.hash;
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get("code");
 
-        if (supabaseToken) {
-          syncSupabaseOAuth(githubToken, supabaseToken);
-          return;
+    // Scenario A: Supabase OAuth redirect — tokens arrive in the hash fragment
+    if (hash) {
+      const params = new URLSearchParams(hash.replace("#", "?"));
+      const supabaseToken = params.get("access_token");
+      const githubToken = params.get("provider_token");
+
+      if (supabaseToken) {
+        handleSupabaseCallback(githubToken, supabaseToken);
+        return;
+      }
+    }
+
+    // Scenario B: Direct GitHub OAuth code redirect
+    if (code) {
+      handleGitHubCodeExchange(code);
+      return;
+    }
+
+    setError("No authentication data received. Please try signing in again.");
+  }, []);
+
+  /**
+   * FAST PATH — Supabase OAuth
+   * 1. Decode the JWT to get username + avatar (zero network calls needed)
+   * 2. Save to localStorage immediately
+   * 3. Redirect to dashboard
+   * 4. Fire-and-forget background sync to backend (non-blocking)
+   */
+  const handleSupabaseCallback = async (githubToken, supabaseToken) => {
+    try {
+      setStatus("Verifying credentials...");
+
+      // Decode the Supabase JWT payload (base64) — no network call needed
+      let username = "";
+      let avatarUrl = "";
+      try {
+        const payload = JSON.parse(atob(supabaseToken.split(".")[1]));
+        username =
+          payload?.user_metadata?.user_name ||
+          payload?.user_metadata?.preferred_username ||
+          payload?.user_metadata?.login ||
+          payload?.email?.split("@")[0] ||
+          "";
+        avatarUrl =
+          payload?.user_metadata?.avatar_url ||
+          payload?.user_metadata?.picture ||
+          "";
+      } catch (_) {
+        // JWT decode failed — fall back to a GitHub API call
+      }
+
+      // If JWT decode failed, do a single lightweight GitHub API call
+      if (!username && githubToken) {
+        setStatus("Fetching profile...");
+        const res = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `Bearer ${githubToken}` },
+        });
+        if (res.ok) {
+          const profile = await res.json();
+          username = profile.login || "";
+          avatarUrl = profile.avatar_url || "";
         }
       }
 
-      // Scenario B: Direct GitHub OAuth redirect (returns code in query params '?')
-      if (code) {
-        exchangeToken(code);
-        return;
+      if (!username) {
+        throw new Error("Could not identify your GitHub account. Please try again.");
       }
 
-      setError("No authentication token or code received from the callback redirect.");
-    }
-  }, []);
+      // ✅ SAVE IMMEDIATELY — redirect with zero backend latency
+      setStatus("Welcome back! Loading workspace...");
+      localStorage.setItem("nexus_auth", "true");
+      localStorage.setItem("github_username", username);
+      localStorage.setItem("github_avatar", avatarUrl);
+      if (githubToken) localStorage.setItem("github_token", githubToken);
 
-  // Handler for Supabase OAuth Callback (Hash Parsing)
-  const syncSupabaseOAuth = async (githubToken, supabaseToken) => {
-    try {
-      setStatus("Fetching profile details from GitHub...");
-      
-      // If we got a provider token, fetch the user's actual profile and repositories
-      const headers = { "Content-Type": "application/json" };
+      // Notify app shell to update state
+      window.dispatchEvent(new Event("nexus-auth-change"));
+
+      // Navigate to dashboard immediately
+      router.replace("/dashboard");
+
+      // 🔄 Fire-and-forget: sync to backend in background (non-blocking)
       if (githubToken) {
-        headers["Authorization"] = `Bearer ${githubToken}`;
+        syncToBackgroundInBackground(username, avatarUrl, githubToken).catch(() => {});
       }
+    } catch (err) {
+      console.error("Supabase callback error:", err);
+      setError(err.message || "Authentication failed. Please try again.");
+    }
+  };
 
-      // 1. Fetch GitHub Profile
-      const profileRes = await fetch("https://api.github.com/user", { headers });
-      if (!profileRes.ok) {
-        throw new Error("Failed to fetch profile details from GitHub API.");
-      }
-      const profile = await profileRes.json();
-      const username = profile.login;
-
-      setStatus("Fetching repositories...");
-
-      // 2. Fetch GitHub Repositories
-      const reposRes = await fetch(`https://api.github.com/user/repos?sort=updated&per_page=100`, { headers });
+  /**
+   * Background sync — runs after redirect, does NOT block login
+   */
+  const syncToBackgroundInBackground = async (username, avatarUrl, githubToken) => {
+    try {
+      // Fetch repos quietly in the background
+      const reposRes = await fetch(
+        `https://api.github.com/user/repos?sort=updated&per_page=100`,
+        { headers: { Authorization: `Bearer ${githubToken}` } }
+      );
       let repositories = [];
       if (reposRes.ok) {
-        const rawRepos = await reposRes.json();
-        const seenIds = new Set();
-        if (Array.isArray(rawRepos)) {
-          for (const r of rawRepos) {
-            if (r && r.id && !seenIds.has(r.id)) {
-              // Skip the Python version of SmartEco
-              if (r.name === "SmartEco" && r.language === "Python") {
-                continue;
-              }
-              seenIds.add(r.id);
-              repositories.push(r);
-            }
+        const raw = await reposRes.json();
+        const seen = new Set();
+        for (const r of raw) {
+          if (r?.id && !seen.has(r.id)) {
+            if (r.name === "SmartEco" && r.language === "Python") continue;
+            seen.add(r.id);
+            repositories.push(r);
           }
         }
       }
 
-      setStatus("Synchronizing profile to database...");
-
-      // 3. Sync to Supabase PostgreSQL via our backend
-      const syncRes = await fetch(`${API_URL}/api/auth/sync-github`, {
+      // Sync profile + repos to Supabase DB via backend
+      await fetch(`${API_URL}/api/auth/sync-github`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username,
-          email: profile.email || `${username}@github.com`,
-          avatarUrl: profile.avatar_url,
-          accessToken: githubToken || null,
-          repositories
-        })
+          email: `${username}@github.com`,
+          avatarUrl,
+          accessToken: githubToken,
+          repositories,
+        }),
       });
-
-      if (!syncRes.ok) {
-        const errJson = await syncRes.json().catch(() => ({}));
-        throw new Error(errJson.error || "Failed to synchronize profile with the database.");
-      }
-
-      setStatus("Authentication successful! Loading workspace...");
-
-      // 4. Save local state parameters
-      localStorage.setItem("nexus_auth", "true");
-      localStorage.setItem("github_username", username);
-      localStorage.setItem("github_avatar", profile.avatar_url);
-      if (githubToken) {
-        localStorage.setItem("github_token", githubToken);
-      }
-
-      // Dispatch event to sync state across the ClientAppShell
-      window.dispatchEvent(new Event("nexus-auth-change"));
-      
-      // Route to dashboard
-      router.replace("/dashboard");
-    } catch (err) {
-      console.error("Supabase OAuth Sync failed:", err);
-      setError(err.message || "Failed to sync GitHub authentication with Supabase.");
+    } catch (_) {
+      // Silent — background sync failure should never affect the user
     }
   };
 
-  // Handler for Direct GitHub OAuth Callback (Code Exchange)
-  const exchangeToken = async (code) => {
+  /**
+   * Direct GitHub OAuth code exchange (via backend)
+   */
+  const handleGitHubCodeExchange = async (code) => {
     try {
-      setStatus("Exchanging code for credentials...");
-      
+      setStatus("Exchanging credentials...");
+
       const res = await fetch(`${API_URL}/api/auth/github-token-exchange`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,187 +162,238 @@ export default function AuthCallbackPage() {
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "GitHub authorization token exchange failed.");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Token exchange failed.");
       }
 
       const data = await res.json();
-      setStatus("Authentication successful! Loading workspace...");
 
-      // Store credentials locally
       localStorage.setItem("nexus_auth", "true");
       localStorage.setItem("github_username", data.github.username);
       localStorage.setItem("github_avatar", data.github.avatarUrl);
       localStorage.setItem("github_token", data.github.accessToken);
 
-      // Dispatch event to sync state across the ClientAppShell
       window.dispatchEvent(new Event("nexus-auth-change"));
-      
-      // Navigate to dashboard
       router.replace("/dashboard");
     } catch (err) {
       console.error("Token exchange failed:", err);
-      setError(err.message || "Failed to authenticate your account with GitHub.");
+      setError(err.message || "Failed to authenticate. Please try again.");
     }
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      backgroundColor: "var(--bg-color, #0b0f19)",
-      color: "var(--text-primary, #ffffff)",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "center",
-      alignItems: "center",
-      padding: "2rem",
-      position: "relative"
-    }}>
-      {/* Background Dot Grid Pattern matching the Landing Page */}
-      <div style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        opacity: 0.03,
-        pointerEvents: "none",
-        backgroundImage: "radial-gradient(var(--border-color, #334155) 1px, transparent 1px)",
-        backgroundSize: "24px 24px"
-      }} />
-
-      <div style={{
-        maxWidth: "800px",
-        width: "100%",
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#0b0f19",
+        color: "#ffffff",
         display: "flex",
         flexDirection: "column",
+        justifyContent: "center",
         alignItems: "center",
-        textAlign: "center",
-        zIndex: 10,
-        gap: "2.5rem"
-      }}>
-        {/* Logo Shield */}
-        <div style={{
+        padding: "2rem",
+        position: "relative",
+        fontFamily: "monospace",
+      }}
+    >
+      {/* Dot grid background */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: 0.04,
+          pointerEvents: "none",
+          backgroundImage: "radial-gradient(#334155 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+
+      <div
+        style={{
+          maxWidth: "820px",
+          width: "100%",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.4rem 1rem",
-          border: "1px solid var(--border-color, #334155)",
-          backgroundColor: "var(--color-off-white, #f8fafc)",
-          fontSize: "0.75rem",
-          fontFamily: "monospace",
-          letterSpacing: "0.1em",
-          color: "var(--text-primary, #ffffff)",
-          boxShadow: "2px 2px 0px var(--border-color, #334155)"
-        }}>
-          <Terminal size={14} />
-          <span>NEXUS AI PIPELINE COMMAND CENTER</span>
+          textAlign: "center",
+          zIndex: 10,
+          gap: "2rem",
+        }}
+      >
+        {/* Logo bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.4rem 1rem",
+            border: "1px solid #334155",
+            fontSize: "0.7rem",
+            letterSpacing: "0.12em",
+            color: "#94a3b8",
+            boxShadow: "2px 2px 0px #334155",
+          }}
+        >
+          <Terminal size={13} />
+          <span>NEXUS AI — PIPELINE COMMAND CENTER</span>
         </div>
 
-        {/* Hero Title */}
+        {/* Heading */}
         <div>
-          <h1 style={{
-            fontSize: "3rem",
-            fontWeight: 900,
-            letterSpacing: "-0.04em",
-            lineHeight: "1.05",
-            color: "var(--text-primary, #ffffff)"
-          }}>
+          <h1
+            style={{
+              fontSize: "2.75rem",
+              fontWeight: 900,
+              letterSpacing: "-0.04em",
+              lineHeight: 1.05,
+              color: "#ffffff",
+              fontFamily: "sans-serif",
+            }}
+          >
             One Platform.<br />Six DevOps Superpowers.
           </h1>
-          <p style={{
-            fontSize: "1rem",
-            color: "var(--text-secondary, #94a3b8)",
-            marginTop: "1rem",
-            maxWidth: "600px",
-            lineHeight: "1.5"
-          }}>
-            All-in-one build log intelligence, release studio, pipeline kanban, test analytics, and automation triggers. Deployed on Supabase.
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#64748b",
+              marginTop: "0.75rem",
+              maxWidth: "560px",
+              lineHeight: 1.6,
+              fontFamily: "sans-serif",
+            }}
+          >
+            Build log intelligence · Release studio · Pipeline kanban · Test analytics · Automation triggers — all in one workspace.
           </p>
         </div>
 
-        {/* Action Loader Card matching Landing Page card shape and style */}
-        <div style={{
-          border: "1px solid var(--border-color, #334155)",
-          padding: "2.5rem",
-          backgroundColor: "var(--color-off-white, #f8fafc)",
-          width: "100%",
-          maxWidth: "460px",
-          position: "relative",
-          boxShadow: "8px 8px 0px var(--border-color, #334155)",
-          textAlign: "left"
-        }}>
-          <div className="corner-dot tl">+</div>
-          <div className="corner-dot tr">+</div>
-          <div className="corner-dot bl">+</div>
-          <div className="corner-dot br">+</div>
+        {/* Auth loader / error card */}
+        <div
+          style={{
+            border: "1px solid #1e293b",
+            padding: "2.5rem 2rem",
+            backgroundColor: "#111827",
+            width: "100%",
+            maxWidth: "420px",
+            position: "relative",
+            boxShadow: "6px 6px 0px #1e293b",
+          }}
+        >
+          {/* Corner markers */}
+          {[
+            { top: -6, left: -6 },
+            { top: -6, right: -6 },
+            { bottom: -6, left: -6 },
+            { bottom: -6, right: -6 },
+          ].map((pos, i) => (
+            <span
+              key={i}
+              style={{
+                position: "absolute",
+                color: "#334155",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                lineHeight: 1,
+                ...pos,
+              }}
+            >
+              +
+            </span>
+          ))}
 
           {error ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              <h3 style={{ fontFamily: "monospace", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-danger, #ef4444)", borderBottom: "1px dotted var(--border-color, #334155)", paddingBottom: "0.75rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", textAlign: "left" }}>
+              <p style={{ fontSize: "0.7rem", color: "#ef4444", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 ❌ Authentication Error
-              </h3>
-              <p style={{ fontSize: "0.75rem", color: "var(--text-secondary, #94a3b8)", lineHeight: "1.4" }}>
-                {error}
               </p>
+              <p style={{ fontSize: "0.75rem", color: "#94a3b8", lineHeight: 1.5 }}>{error}</p>
               <button
                 onClick={() => router.replace("/")}
                 style={{
-                  width: "100%",
-                  padding: "0.75rem 1rem",
-                  backgroundColor: "var(--color-danger, #ef4444)",
-                  color: "#ffffff",
+                  padding: "0.65rem 1rem",
+                  backgroundColor: "#ef4444",
+                  color: "#fff",
                   border: "none",
-                  fontFamily: "monospace",
                   cursor: "pointer",
-                  boxShadow: "3px 3px 0px #000000"
+                  fontFamily: "monospace",
+                  fontSize: "0.75rem",
+                  boxShadow: "3px 3px 0px #000",
                 }}
               >
-                Back to Landing Page
+                ← Back to Home
               </button>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem", alignItems: "center", padding: "1rem 0" }}>
-              <Loader2 size={36} className="animate-spin" style={{ color: "var(--color-accent, #3b82f6)" }} />
-              <div style={{ textAlign: "center" }}>
-                <h3 style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "monospace" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "1rem",
+                padding: "0.5rem 0",
+              }}
+            >
+              <Loader2
+                size={38}
+                style={{
+                  color: "#3b82f6",
+                  animation: "spin 0.8s linear infinite",
+                }}
+              />
+              <div>
+                <p
+                  style={{
+                    fontSize: "0.72rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    color: "#e2e8f0",
+                    marginBottom: "0.3rem",
+                  }}
+                >
                   🔑 Secure Handshake
-                </h3>
-                <p style={{ fontSize: "0.7rem", color: "var(--text-secondary, #94a3b8)", marginTop: "0.5rem", fontFamily: "monospace" }}>
-                  {status}
                 </p>
+                <p style={{ fontSize: "0.68rem", color: "#475569" }}>{status}</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Feature Highlights Grid */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "1.5rem",
-          width: "100%",
-          marginTop: "1.5rem",
-          textAlign: "left",
-          opacity: 0.5 // Dimmed during authentication loader for hierarchy
-        }}>
-          <div style={{ border: "1px solid var(--border-color, #334155)", padding: "1.25rem", backgroundColor: "var(--color-off-white, #f8fafc)" }}>
-            <div style={{ color: "var(--color-accent, #3b82f6)", marginBottom: "0.5rem" }}><Cpu size={18} /></div>
-            <strong style={{ fontSize: "0.8rem", display: "block", marginBottom: "0.25rem" }}>Log Diagnostics</strong>
-            <p style={{ fontSize: "0.7rem", color: "var(--text-secondary, #94a3b8)", lineHeight: "1.4" }}>Parse failing docker/compile logs and generate target hotfix code patches.</p>
-          </div>
-          <div style={{ border: "1px solid var(--border-color, #334155)", padding: "1.25rem", backgroundColor: "var(--color-off-white, #f8fafc)" }}>
-            <div style={{ color: "var(--color-accent, #3b82f6)", marginBottom: "0.5rem" }}><Sparkles size={18} /></div>
-            <strong style={{ fontSize: "0.8rem", display: "block", marginBottom: "0.25rem" }}>Release & Docs Studio</strong>
-            <p style={{ fontSize: "0.7rem", color: "var(--text-secondary, #94a3b8)", lineHeight: "1.4" }}>Compile markdown changelogs, release notes, and commit summaries instantly.</p>
-          </div>
-          <div style={{ border: "1px solid var(--border-color, #334155)", padding: "1.25rem", backgroundColor: "var(--color-off-white, #f8fafc)" }}>
-            <div style={{ color: "var(--color-accent, #3b82f6)", marginBottom: "0.5rem" }}><Network size={18} /></div>
-            <strong style={{ fontSize: "0.8rem", display: "block", marginBottom: "0.25rem" }}>Visual Automation</strong>
-            <p style={{ fontSize: "0.7rem", color: "var(--text-secondary, #94a3b8)", lineHeight: "1.4" }}>Map Git hooks to test builds and deploy sequences in a visual forge.</p>
-          </div>
+        {/* Feature cards — dimmed while loading */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "1rem",
+            width: "100%",
+            opacity: 0.35,
+            pointerEvents: "none",
+          }}
+        >
+          {[
+            { icon: <Cpu size={16} />, title: "Log Diagnostics", desc: "Parse failing build logs and generate hotfix patches instantly." },
+            { icon: <Sparkles size={16} />, title: "Release Studio", desc: "Generate changelogs, release notes, and commit summaries." },
+            { icon: <Network size={16} />, title: "Visual Automation", desc: "Map Git hooks to builds and deploy sequences visually." },
+          ].map((f, i) => (
+            <div
+              key={i}
+              style={{
+                border: "1px solid #1e293b",
+                padding: "1rem",
+                backgroundColor: "#0f172a",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ color: "#3b82f6", marginBottom: "0.4rem" }}>{f.icon}</div>
+              <strong style={{ fontSize: "0.75rem", color: "#e2e8f0", display: "block", marginBottom: "0.25rem", fontFamily: "sans-serif" }}>
+                {f.title}
+              </strong>
+              <p style={{ fontSize: "0.65rem", color: "#475569", lineHeight: 1.5, fontFamily: "sans-serif" }}>{f.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Inline keyframe for spinner */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
