@@ -14,10 +14,8 @@ export default function AuthCallbackPage() {
     if (typeof window === "undefined") return;
 
     const hash = window.location.hash;
-    const searchParams = new URLSearchParams(window.location.search);
-    const code = searchParams.get("code");
 
-    // Scenario A: Supabase OAuth redirect — tokens arrive in the hash fragment
+    // Supabase OAuth redirect — tokens arrive in the hash fragment (#)
     if (hash) {
       const params = new URLSearchParams(hash.replace("#", "?"));
       const supabaseToken = params.get("access_token");
@@ -29,15 +27,10 @@ export default function AuthCallbackPage() {
       }
     }
 
-    // Scenario B: Direct GitHub OAuth code redirect
-    if (code) {
-      handleGitHubCodeExchange(code);
-      return;
-    }
-
-    setError("No authentication data received. Please try signing in again.");
+    setError("No active authentication session received. Please try signing in again.");
   }, []);
 
+  // Safe decoding of base64url encoded Supabase JWT
   const decodeSupabaseJWT = (token) => {
     try {
       const parts = token.split(".");
@@ -60,18 +53,10 @@ export default function AuthCallbackPage() {
     }
   };
 
-  /**
-   * FAST PATH — Supabase OAuth
-   * 1. Decode the JWT to get username + avatar (zero network calls needed)
-   * 2. Save to localStorage immediately
-   * 3. Redirect to dashboard
-   * 4. Fire-and-forget background sync to backend (non-blocking)
-   */
   const handleSupabaseCallback = async (githubToken, supabaseToken) => {
     try {
       setStatus("Verifying credentials...");
 
-      // Decode the Supabase JWT payload (base64) — no network call needed
       let username = "";
       let avatarUrl = "";
       
@@ -90,29 +75,17 @@ export default function AuthCallbackPage() {
           "";
       }
 
-      // If JWT decode failed, do a single lightweight GitHub API call
-      if (!username && githubToken) {
-        setStatus("Fetching profile...");
-        const res = await fetch("https://api.github.com/user", {
-          headers: { Authorization: `Bearer ${githubToken}` },
-        });
-        if (res.ok) {
-          const profile = await res.json();
-          username = profile.login || "";
-          avatarUrl = profile.avatar_url || "";
-        }
-      }
-
       if (!username) {
-        throw new Error("Could not identify your GitHub account. Please try again.");
+        throw new Error("Could not identify your GitHub account details.");
       }
 
-      // ✅ SAVE IMMEDIATELY — redirect with zero backend latency
       setStatus("Welcome back! Loading workspace...");
       localStorage.setItem("nexus_auth", "true");
       localStorage.setItem("github_username", username);
       localStorage.setItem("github_avatar", avatarUrl);
-      if (githubToken) localStorage.setItem("github_token", githubToken);
+      if (githubToken) {
+        localStorage.setItem("github_token", githubToken);
+      }
 
       // Notify app shell to update state
       window.dispatchEvent(new Event("nexus-auth-change"));
@@ -120,9 +93,9 @@ export default function AuthCallbackPage() {
       // Navigate to dashboard immediately
       router.replace("/dashboard");
 
-      // 🔄 Fire-and-forget: sync to backend in background (non-blocking)
+      // Sync user profile & repositories in the background
       if (githubToken) {
-        syncToBackgroundInBackground(username, avatarUrl, githubToken).catch(() => {});
+        syncToBackground(username, avatarUrl, githubToken).catch(() => {});
       }
     } catch (err) {
       console.error("Supabase callback error:", err);
@@ -130,12 +103,9 @@ export default function AuthCallbackPage() {
     }
   };
 
-  /**
-   * Background sync — runs after redirect, does NOT block login
-   */
-  const syncToBackgroundInBackground = async (username, avatarUrl, githubToken) => {
+  const syncToBackground = async (username, avatarUrl, githubToken) => {
     try {
-      // Fetch repos quietly in the background
+      // Fetch repos quietly
       const reposRes = await fetch(
         `https://api.github.com/user/repos?sort=updated&per_page=100`,
         { headers: { Authorization: `Bearer ${githubToken}` } }
@@ -153,7 +123,7 @@ export default function AuthCallbackPage() {
         }
       }
 
-      // Sync profile + repos to Supabase DB via backend
+      // Sync profile & repos to our database via backend
       await fetch(`${API_URL}/api/auth/sync-github`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,40 +136,7 @@ export default function AuthCallbackPage() {
         }),
       });
     } catch (_) {
-      // Silent — background sync failure should never affect the user
-    }
-  };
-
-  /**
-   * Direct GitHub OAuth code exchange (via backend)
-   */
-  const handleGitHubCodeExchange = async (code) => {
-    try {
-      setStatus("Exchanging credentials...");
-
-      const res = await fetch(`${API_URL}/api/auth/github-token-exchange`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Token exchange failed.");
-      }
-
-      const data = await res.json();
-
-      localStorage.setItem("nexus_auth", "true");
-      localStorage.setItem("github_username", data.github.username);
-      localStorage.setItem("github_avatar", data.github.avatarUrl);
-      localStorage.setItem("github_token", data.github.accessToken);
-
-      window.dispatchEvent(new Event("nexus-auth-change"));
-      router.replace("/dashboard");
-    } catch (err) {
-      console.error("Token exchange failed:", err);
-      setError(err.message || "Failed to authenticate. Please try again.");
+      // Silent catch (runs in background)
     }
   };
 
@@ -237,12 +174,10 @@ export default function AuthCallbackPage() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          textAlign: "center",
           zIndex: 10,
           gap: "2rem",
         }}
       >
-        {/* Logo bar */}
         <div
           style={{
             display: "flex",
@@ -260,7 +195,6 @@ export default function AuthCallbackPage() {
           <span>NEXUS AI — PIPELINE COMMAND CENTER</span>
         </div>
 
-        {/* Heading */}
         <div>
           <h1
             style={{
@@ -270,25 +204,13 @@ export default function AuthCallbackPage() {
               lineHeight: 1.05,
               color: "#ffffff",
               fontFamily: "sans-serif",
+              textAlign: "center",
             }}
           >
             One Platform.<br />Six DevOps Superpowers.
           </h1>
-          <p
-            style={{
-              fontSize: "0.9rem",
-              color: "#64748b",
-              marginTop: "0.75rem",
-              maxWidth: "560px",
-              lineHeight: 1.6,
-              fontFamily: "sans-serif",
-            }}
-          >
-            Build log intelligence · Release studio · Pipeline kanban · Test analytics · Automation triggers — all in one workspace.
-          </p>
         </div>
 
-        {/* Auth loader / error card */}
         <div
           style={{
             border: "1px solid #1e293b",
@@ -361,7 +283,7 @@ export default function AuthCallbackPage() {
                   animation: "spin 0.8s linear infinite",
                 }}
               />
-              <div>
+              <div style={{ textAlign: "center" }}>
                 <p
                   style={{
                     fontSize: "0.72rem",
@@ -379,7 +301,7 @@ export default function AuthCallbackPage() {
           )}
         </div>
 
-        {/* Feature cards — dimmed while loading */}
+        {/* Feature Highlights */}
         <div
           style={{
             display: "grid",
@@ -414,7 +336,6 @@ export default function AuthCallbackPage() {
         </div>
       </div>
 
-      {/* Inline keyframe for spinner */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
