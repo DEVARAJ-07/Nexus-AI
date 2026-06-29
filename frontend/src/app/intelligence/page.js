@@ -254,7 +254,7 @@ index db838d9..e23df1f 100644
     setMessages((prev) => [...prev, assistantMsg]);
 
     try {
-      const storedUser = typeof window !== "undefined" ? localStorage.getItem("github_username") || "DEVARAJ-07" : "DEVARAJ-07";
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("github_username") || "Developer" : "Developer";
       const response = await fetch(`${API_URL}/api/ai/chat-stream?message=${encodeURIComponent(input)}&model=${selectedModel}&username=${encodeURIComponent(storedUser)}`);
       
       if (!response.ok) throw new Error("Backend offline");

@@ -38,6 +38,28 @@ export default function AuthCallbackPage() {
     setError("No authentication data received. Please try signing in again.");
   }, []);
 
+  const decodeSupabaseJWT = (token) => {
+    try {
+      const parts = token.split(".");
+      if (parts.length < 2) return null;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = base64.length % 4;
+      const paddedBase64 = pad ? base64 + "=".repeat(4 - pad) : base64;
+      const rawString = atob(paddedBase64);
+      const jsonString = decodeURIComponent(
+        rawString
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(jsonString);
+    } catch (e) {
+      console.error("JWT Decode error:", e);
+      return null;
+    }
+  };
+
   /**
    * FAST PATH — Supabase OAuth
    * 1. Decode the JWT to get username + avatar (zero network calls needed)
@@ -52,20 +74,20 @@ export default function AuthCallbackPage() {
       // Decode the Supabase JWT payload (base64) — no network call needed
       let username = "";
       let avatarUrl = "";
-      try {
-        const payload = JSON.parse(atob(supabaseToken.split(".")[1]));
+      
+      const payload = decodeSupabaseJWT(supabaseToken);
+      if (payload) {
         username =
-          payload?.user_metadata?.user_name ||
           payload?.user_metadata?.preferred_username ||
+          payload?.user_metadata?.user_name ||
           payload?.user_metadata?.login ||
+          payload?.user_metadata?.full_name ||
           payload?.email?.split("@")[0] ||
           "";
         avatarUrl =
           payload?.user_metadata?.avatar_url ||
           payload?.user_metadata?.picture ||
           "";
-      } catch (_) {
-        // JWT decode failed — fall back to a GitHub API call
       }
 
       // If JWT decode failed, do a single lightweight GitHub API call
