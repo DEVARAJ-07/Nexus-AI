@@ -1,142 +1,143 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../config/db");
-const env = require("../config/env");
-const axios = require("axios");
+const geminiService = require("../services/gemini.service");
+const groqService = require("../services/groq.service");
+const ollamaService = require("../services/ollama.service");
+const openrouterService = require("../services/openrouter.service");
 
-// Helper to get or create a workspace
-async function getWorkspaceId(req) {
-  const headerWorkspaceId = req.headers["x-workspace-id"];
-  if (headerWorkspaceId) return headerWorkspaceId;
-
-  let ws = await prisma.workspace.findFirst();
-  if (!ws) {
-    ws = await prisma.workspace.create({
-      data: {
-        name: "Default Workspace",
-        plan: "FREE",
-      },
-    });
-  }
-  return ws.id;
-}
-
-// SSE Stream for Claude AI Chat
+// SSE Stream for AI Chat with DB query caching and history logging
 router.get("/chat-stream", async (req, res) => {
   const message = req.query.message || "Hello";
-  
+  const model = req.query.model || "groq-llama-3.3-70b";
+  const username = req.query.username || "DEVARAJ-07";
+  const chatId = req.query.chatId;
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-  res.flushHeaders(); // Establish stream
+  res.flushHeaders();
+
+  let fullResponseText = "";
 
   try {
-    const workspaceId = await getWorkspaceId(req);
-    const docs = await prisma.document.findMany({
-      where: { workspaceId },
-      take: 5,
+    // 1. Resolve User from Database
+    let user = await prisma.user.findFirst({
+      where: { name: username }
     });
-    const knowledge = await prisma.knowledgeItem.findMany({
-      where: { workspaceId },
-      take: 5,
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: `${username}@github.com`,
+          name: username
+        }
+      });
+    }
+
+    // 2. Resolve or Create Chat Session
+    let chat;
+    if (chatId) {
+      chat = await prisma.chat.findUnique({
+        where: { id: chatId }
+      });
+    }
+    if (!chat) {
+      chat = await prisma.chat.create({
+        data: {
+          userId: user.id,
+          title: message.substring(0, 40)
+        }
+      });
+    }
+
+    // 3. Load Chat History
+    const dbMessages = await prisma.message.findMany({
+      where: { chatId: chat.id },
+      orderBy: { createdAt: "asc" },
+      take: 10
     });
 
+    const chatHistory = dbMessages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    // 4. Save User Message to Database
+    await prisma.message.create({
+      data: {
+        chatId: chat.id,
+        role: "user",
+        content: message
+      }
+    });
+
+    // 5. System prompt
     const systemPrompt = `You are Nexus AI, an advanced developer pipeline intelligence engine.
-Workspace ID: ${workspaceId}
+Your environment is fully connected to Supabase and GitHub.
+You are chatting with developer: @${username} (User ID: ${user.id}) in Chat Session: ${chat.title}.
+Analyze all diagnostic, code pipeline, and log questions directly and with code blocks.`;
 
-Current Scanned Workspace Documents:
-${docs.map(d => `- ${d.name} (${d.fileUrl})`).join("\n")}
+    const onToken = (token) => {
+      fullResponseText += token;
+      res.write(`data: ${JSON.stringify({ token, chatId: chat.id })}\n\n`);
+    };
 
-Knowledge Base Items:
-${knowledge.map(k => `- [${k.title}]: ${k.content}`).join("\n")}
-
-Acknowledge this context if queried. Answer all diagnostic, code pipeline, and log questions directly and with code blocks.`;
-
-    const isMockKey = !env.CLAUDE_API_KEY || env.CLAUDE_API_KEY === "claude_mock_api_key_4082" || env.CLAUDE_API_KEY.includes("mock");
-
-    if (!isMockKey) {
+    const onDone = async () => {
       try {
-        const response = await axios({
-          method: "post",
-          url: "https://api.anthropic.com/v1/messages",
-          headers: {
-            "x-api-key": env.CLAUDE_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
+        // Save Assistant Message to Database
+        await prisma.message.create({
           data: {
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: [{ role: "user", content: message }],
-            stream: true,
-          },
-          responseType: "stream",
-        });
-
-        let buffer = "";
-        response.data.on("data", chunk => {
-          buffer += chunk.toString();
-          const lines = buffer.split("\n");
-          buffer = lines.pop();
-
-          for (const line of lines) {
-            const cleanLine = line.trim();
-            if (cleanLine.startsWith("data:")) {
-              try {
-                const jsonStr = cleanLine.substring(5).trim();
-                if (jsonStr === "[DONE]") continue;
-                const parsed = JSON.parse(jsonStr);
-                if (parsed.type === "content_block_delta" && parsed.delta && parsed.delta.text) {
-                  res.write(`data: ${JSON.stringify({ token: parsed.delta.text })}\n\n`);
-                }
-              } catch (e) {
-                // Incomplete chunk parse error - skip
-              }
-            }
+            chatId: chat.id,
+            role: "assistant",
+            content: fullResponseText
           }
         });
 
-        response.data.on("end", () => {
-          res.write("data: [DONE]\n\n");
-          res.end();
+        // Save Log in Query Database
+        await prisma.query.create({
+          data: {
+            userId: user.id,
+            queryText: message.substring(0, 255),
+            response: fullResponseText.substring(0, 1000),
+            status: "COMPLETED"
+          }
         });
-
-        req.on("close", () => {
-          if (response.data.destroy) response.data.destroy();
-        });
-        return;
-      } catch (apiError) {
-        console.error("Claude API call failed, falling back to mock streaming:", apiError.message);
+      } catch (err) {
+        console.error("Failed to save stream response to DB:", err);
       }
-    }
-
-    // Fallback streaming for development/mock mode
-    const tokens = [
-      "Hello! ", "This ", "is ", "Nexus AI. ", "\n\n",
-      "[Dev Mode: Fallback Stream]\n",
-      "I ", "detected ", "your ", "workspace ", "context. ",
-      `Currently tracking workspace "${workspaceId}" with ${docs.length} documents. `,
-      "\n\nHere is a diagnostic sample analysis based on your query: '", message, "'.\n",
-      "Ensure a valid `CLAUDE_API_KEY` is configured in `backend/.env` for real-time Sonnet integration."
-    ];
-
-    let currentToken = 0;
-    const interval = setInterval(() => {
-      if (currentToken < tokens.length) {
-        res.write(`data: ${JSON.stringify({ token: tokens[currentToken] })}\n\n`);
-        currentToken++;
-      } else {
-        res.write("data: [DONE]\n\n");
-        clearInterval(interval);
-        res.end();
-      }
-    }, 50);
-
-    req.on("close", () => {
-      clearInterval(interval);
+      res.write("data: [DONE]\n\n");
       res.end();
-    });
+    };
+
+    const onError = async (err) => {
+      console.error("Stream emission failed, error:", err);
+      try {
+        await prisma.query.create({
+          data: {
+            userId: user.id,
+            queryText: message.substring(0, 255),
+            response: err.message,
+            status: "FAILED"
+          }
+        });
+      } catch (dbErr) {
+        console.error(dbErr);
+      }
+      res.write(`data: ${JSON.stringify({ token: "\nError generating response." })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    };
+
+    // 6. Delegate stream invocation
+    if (model.startsWith("groq-")) {
+      await groqService.generateChatStream(model, systemPrompt, message, chatHistory, onToken, onDone, onError);
+    } else if (model.startsWith("ollama-")) {
+      await ollamaService.generateChatStream(model, systemPrompt, message, chatHistory, onToken, onDone, onError);
+    } else if (model.startsWith("openrouter-")) {
+      await openrouterService.generateChatStream(model, systemPrompt, message, chatHistory, onToken, onDone, onError);
+    } else {
+      await geminiService.generateChatStream(model, systemPrompt, message, chatHistory, onToken, onDone, onError);
+    }
 
   } catch (error) {
     console.error("Chat stream root error:", error);
@@ -146,117 +147,79 @@ Acknowledge this context if queried. Answer all diagnostic, code pipeline, and l
   }
 });
 
-router.post("/research", (req, res) => {
-  const { topic } = req.body;
-  res.status(200).json({
-    topic,
-    summary: `Structured summary about ${topic}. Retrieved citations from active web search probes.`,
-    citations: ["https://docs.nexus-ci.com/research", "https://wikipedia.org"],
-  });
+// Run Build Log Diagnostics & Code Patch Generation
+router.post("/diagnose", async (req, res) => {
+  try {
+    const { logText, model } = req.body;
+    if (!logText) {
+      return res.status(400).json({ error: "No log content available for diagnosis." });
+    }
+
+    let diagnosis;
+    if (model && model.startsWith("groq-")) {
+      diagnosis = await groqService.diagnoseLog(model, logText);
+    } else if (model && model.startsWith("ollama-")) {
+      diagnosis = await ollamaService.diagnoseLog(model, logText);
+    } else if (model && model.startsWith("openrouter-")) {
+      diagnosis = await openrouterService.diagnoseLog(model, logText);
+    } else {
+      diagnosis = await geminiService.diagnoseLog(logText);
+    }
+    
+    res.status(200).json(diagnosis);
+  } catch (error) {
+    console.error("AI Diagnostics route error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// Knowledge Base entries
+// Web Research & Summarizer Endpoint
+router.post("/research", async (req, res) => {
+  try {
+    const { topic, depth, model } = req.body;
+    if (!topic) {
+      return res.status(400).json({ error: "Topic is required" });
+    }
+
+    let researchResult;
+    if (model && model.startsWith("groq-")) {
+      researchResult = await groqService.generateResearchSummary(model, topic, depth || "quick");
+    } else if (model && model.startsWith("ollama-")) {
+      researchResult = await ollamaService.generateResearchSummary(model, topic, depth || "quick");
+    } else if (model && model.startsWith("openrouter-")) {
+      researchResult = await openrouterService.generateResearchSummary(model, topic, depth || "quick");
+    } else {
+      researchResult = await geminiService.generateResearchSummary(topic, depth || "quick");
+    }
+
+    res.status(200).json({
+      topic,
+      summary: researchResult.summary,
+      citations: researchResult.citations,
+    });
+  } catch (error) {
+    console.error("Research API route error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mock knowledge base endpoints for frontend safety
 router.get("/knowledge", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    const items = await prisma.knowledgeItem.findMany({
-      where: { workspaceId },
-    });
-    
-    // Seed default knowledge items if database is empty
-    if (items.length === 0) {
-      const defaultItems = [
-        { title: "Brand Guidelines v2.0", content: "Corporate tone rules and style guidelines.", tags: ["branding", "marketing"], workspaceId },
-        { title: "API Integrations Specs", content: "Webhooks endpoints and schema details.", tags: ["engineering", "docs"], workspaceId }
-      ];
-      await prisma.knowledgeItem.createMany({ data: defaultItems });
-      const seeded = await prisma.knowledgeItem.findMany({ where: { workspaceId } });
-      return res.status(200).json(seeded);
-    }
-    
-    res.status(200).json(items);
-  } catch (error) {
-    console.error("Fetch knowledge error:", error);
-    res.status(500).json({ error: error.message });
-  }
+  res.status(200).json([]);
 });
-
 router.post("/knowledge", async (req, res) => {
-  try {
-    const { title, content, tags } = req.body;
-    const workspaceId = await getWorkspaceId(req);
-    const newItem = await prisma.knowledgeItem.create({
-      data: {
-        title,
-        content,
-        tags: tags || [],
-        workspaceId,
-      },
-    });
-    res.status(201).json(newItem);
-  } catch (error) {
-    console.error("Create knowledge error:", error);
-    res.status(500).json({ error: error.message });
-  }
+  res.status(201).json({ id: "mock-kb", title: req.body.title });
 });
-
 router.delete("/knowledge/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    await prisma.knowledgeItem.delete({
-      where: { id },
-    });
-    res.status(200).json({ message: "Knowledge item deleted" });
-  } catch (error) {
-    console.error("Delete knowledge error:", error);
-    res.status(500).json({ error: error.message });
-  }
+  res.status(200).json({ message: "Knowledge item deleted" });
 });
 
-// Prompts
+// Mock prompt template endpoints for frontend safety
 router.get("/prompts", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    const items = await prisma.prompt.findMany({
-      where: { workspaceId },
-    });
-
-    // Seed default prompts if empty
-    if (items.length === 0) {
-      const defaultPrompts = [
-        { title: "Cold Outreach", content: "Write a high-converting cold outreach email...", category: "Sales", workspaceId },
-        { title: "SEO Blog Outline", content: "Generate an outline for a blog post targeting...", category: "Marketing", workspaceId }
-      ];
-      await prisma.prompt.createMany({ data: defaultPrompts });
-      const seeded = await prisma.prompt.findMany({ where: { workspaceId } });
-      return res.status(200).json(seeded);
-    }
-
-    res.status(200).json(items);
-  } catch (error) {
-    console.error("Fetch prompts error:", error);
-    res.status(500).json({ error: error.message });
-  }
+  res.status(200).json([]);
 });
-
 router.post("/prompts", async (req, res) => {
-  try {
-    const { title, content, category } = req.body;
-    const workspaceId = await getWorkspaceId(req);
-    const newPrompt = await prisma.prompt.create({
-      data: {
-        title,
-        content,
-        category,
-        workspaceId,
-      },
-    });
-    res.status(201).json(newPrompt);
-  } catch (error) {
-    console.error("Create prompt error:", error);
-    res.status(500).json({ error: error.message });
-  }
+  res.status(201).json({ id: "mock-prompt", title: req.body.title });
 });
 
 module.exports = router;
-

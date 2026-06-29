@@ -17,13 +17,8 @@ export default function ClientAppShell({ children }) {
     setIsAuthenticated(auth);
 
     // Route guard: Redirect to landing page if not logged in
-    if (!auth && pathname !== "/") {
+    if (!auth && pathname !== "/" && pathname !== "/auth/callback") {
       router.replace("/");
-    }
-
-    // Redirect to dashboard if logged in and trying to access landing
-    if (auth && pathname === "/") {
-      router.replace("/dashboard");
     }
   }, [pathname, router]);
 
