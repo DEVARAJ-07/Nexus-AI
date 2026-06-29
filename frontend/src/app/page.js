@@ -7,7 +7,6 @@ import { API_URL } from "./config";
 
 export default function LandingPage() {
   const router = useRouter();
-  const [clientId, setClientId] = useState("");
   const [supabaseProjectRef, setSupabaseProjectRef] = useState("nuerryjlhezvihpxhvmo");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -25,13 +24,12 @@ export default function LandingPage() {
       setStoredUser(user);
     }
 
-    // Fetch configuration from backend on mount
+    // Fetch configuration from backend on mount to resolve database project ref
     const fetchConfig = async () => {
       try {
         const res = await fetch(`${API_URL}/api/auth/github-config`);
         if (res.ok) {
           const data = await res.json();
-          setClientId(data.clientId);
           if (data.supabaseProjectRef) {
             setSupabaseProjectRef(data.supabaseProjectRef);
           }
@@ -43,23 +41,19 @@ export default function LandingPage() {
     fetchConfig();
   }, []);
 
-  const handleAuthorize = (e) => {
+  const handleSupabaseLogin = (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
     const redirectUri = `${window.location.origin}/auth/callback`;
 
-    if (clientId) {
-      // Flow A: Direct GitHub OAuth redirection
-      const oauthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user,repo`;
-      window.location.href = oauthUrl;
-    } else if (supabaseProjectRef) {
-      // Flow B: Native Supabase GoTrue Auth redirection with repository scope
+    if (supabaseProjectRef) {
+      // Direct Native Supabase GoTrue Auth redirection with repository scope
       const oauthUrl = `https://${supabaseProjectRef}.supabase.co/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(redirectUri)}&scopes=repo`;
       window.location.href = oauthUrl;
     } else {
-      setError("No GitHub or Supabase authentication credentials are configured on the backend server.");
+      setError("Supabase project reference is not configured on the backend server.");
       setIsLoading(false);
     }
   };
@@ -222,13 +216,13 @@ export default function LandingPage() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleAuthorize} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+            <form onSubmit={handleSupabaseLogin} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
               <h3 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px dotted var(--border-color)", paddingBottom: "0.75rem" }}>
                 🔑 Secure Handshake
               </h3>
               
               <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
-                Click below to sign in with your GitHub account. This will securely authorize your repositories and sync your profile to Supabase.
+                Sign in securely via Supabase Auth to connect your GitHub profile and sync your workspace repositories.
               </p>
 
               {error && (
@@ -268,7 +262,7 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <Github size={16} />
-                    <span>Authorize GitHub Profile</span>
+                    <span>Continue with GitHub</span>
                     <ArrowRight size={14} />
                   </>
                 )}
