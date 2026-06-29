@@ -1,20 +1,85 @@
 "use client";
 
-import React from "react";
-import { Github, Terminal, ArrowRight, Cpu, Sparkles, Network } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Github, Terminal, ArrowRight, Cpu, Sparkles, Network, Loader2, LogOut } from "lucide-react";
+import { API_URL } from "./config";
 
 export default function LandingPage() {
+  const router = useRouter();
+  const [clientId, setClientId] = useState("");
+  const [supabaseProjectRef, setSupabaseProjectRef] = useState("nuerryjlhezvihpxhvmo");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  
+  // Logged in states
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [storedUser, setStoredUser] = useState("");
+
+  useEffect(() => {
+    // Check if user is logged in
+    if (typeof window !== "undefined") {
+      const auth = localStorage.getItem("nexus_auth") === "true";
+      const user = localStorage.getItem("github_username") || "";
+      setIsLoggedIn(auth);
+      setStoredUser(user);
+    }
+
+    // Fetch configuration from backend on mount
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/github-config`);
+        if (res.ok) {
+          const data = await res.json();
+          setClientId(data.clientId);
+          if (data.supabaseProjectRef) {
+            setSupabaseProjectRef(data.supabaseProjectRef);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load OAuth configuration:", err);
+      }
+    };
+    fetchConfig();
+  }, []);
+
   const handleAuthorize = (e) => {
     e.preventDefault();
-    // Complete authentication instantly
-    localStorage.setItem("nexus_auth", "true");
+    setIsLoading(true);
+    setError("");
+
+    const redirectUri = `${window.location.origin}/auth/callback`;
+
+    if (clientId) {
+      // Flow A: Direct GitHub OAuth redirection
+      const oauthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user,repo`;
+      window.location.href = oauthUrl;
+    } else if (supabaseProjectRef) {
+      // Flow B: Native Supabase GoTrue Auth redirection with repository scope
+      const oauthUrl = `https://${supabaseProjectRef}.supabase.co/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(redirectUri)}&scopes=repo`;
+      window.location.href = oauthUrl;
+    } else {
+      setError("No GitHub or Supabase authentication credentials are configured on the backend server.");
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.setItem("nexus_auth", "false");
+    localStorage.removeItem("github_username");
+    localStorage.removeItem("github_avatar");
+    localStorage.removeItem("github_token");
+    setIsLoggedIn(false);
+    setStoredUser("");
+    
+    // Dispatch auth state change
     window.dispatchEvent(new Event("nexus-auth-change"));
   };
 
   return (
     <div style={{
       minHeight: "100vh",
-      backgroundColor: "var(--bg-color)", // Light background matching overview page
+      backgroundColor: "var(--bg-color)",
       color: "var(--text-primary)",
       display: "flex",
       flexDirection: "column",
@@ -23,7 +88,6 @@ export default function LandingPage() {
       padding: "2rem",
       position: "relative"
     }}>
-      {/* Subtle grid pattern backing matching visual style */}
       <div style={{
         position: "absolute",
         top: 0,
@@ -46,7 +110,7 @@ export default function LandingPage() {
         zIndex: 10,
         gap: "2.5rem"
       }}>
-        {/* Logo Shield (Brutalist theme matching topbar) */}
+        {/* Logo Shield */}
         <div style={{
           display: "flex",
           alignItems: "center",
@@ -82,11 +146,11 @@ export default function LandingPage() {
             maxWidth: "600px",
             lineHeight: "1.5"
           }}>
-            All-in-one build log intelligence, release studio, pipeline kanban, test analytics, and automation triggers. Zero context-switching.
+            All-in-one build log intelligence, release studio, pipeline kanban, test analytics, and automation triggers. Deployed on Supabase.
           </p>
         </div>
 
-        {/* Action Auth Card (Brutalist style matching dashboard cards) */}
+        {/* Action Auth Card */}
         <div style={{
           border: "1px solid var(--border-color)",
           padding: "2.5rem",
@@ -94,41 +158,123 @@ export default function LandingPage() {
           width: "100%",
           maxWidth: "460px",
           position: "relative",
-          boxShadow: "8px 8px 0px var(--border-color)"
+          boxShadow: "8px 8px 0px var(--border-color)",
+          textAlign: "left"
         }}>
           <div className="corner-dot tl">+</div>
           <div className="corner-dot tr">+</div>
           <div className="corner-dot bl">+</div>
           <div className="corner-dot br">+</div>
 
-          <form onSubmit={handleAuthorize} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <h3 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px dotted var(--border-color)", paddingBottom: "0.75rem" }}>
-              🔑 Developer Handshake
-            </h3>
-            
-            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
-              Authorize your GitHub account credentials to bootstrap repository pipelines, scan logs, and trigger visual workflows.
-            </p>
+          {isLoggedIn ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+              <h3 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px dotted var(--border-color)", paddingBottom: "0.75rem" }}>
+                👋 Session Active
+              </h3>
+              
+              <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
+                You are currently signed in as <strong style={{ color: "var(--text-primary)" }}>@{storedUser}</strong>. You can navigate directly to your workspace dashboard or sign out below.
+              </p>
 
-            <button 
-              type="submit" 
-              className="brutalist-button"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                fontSize: "0.85rem",
-                padding: "0.85rem 1.5rem",
-                boxShadow: "4px 4px 0px var(--border-color)",
-                backgroundColor: "var(--color-warm-grey)",
-                color: "var(--text-primary)",
-                cursor: "pointer"
-              }}
-            >
-              <Github size={16} />
-              <span>Authorize GitHub Profile</span>
-              <ArrowRight size={14} />
-            </button>
-          </form>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "0.5rem" }}>
+                <button 
+                  onClick={() => router.push("/dashboard")}
+                  className="brutalist-button"
+                  style={{
+                    width: "100%",
+                    justifyContent: "center",
+                    fontSize: "0.85rem",
+                    padding: "0.85rem 1.5rem",
+                    boxShadow: "4px 4px 0px var(--border-color)",
+                    backgroundColor: "var(--color-accent)",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem"
+                  }}
+                >
+                  <span>Go to Workspace Dashboard</span>
+                  <ArrowRight size={14} />
+                </button>
+
+                <button 
+                  onClick={handleLogout}
+                  className="brutalist-button"
+                  style={{
+                    width: "100%",
+                    justifyContent: "center",
+                    fontSize: "0.85rem",
+                    padding: "0.85rem 1.5rem",
+                    boxShadow: "4px 4px 0px var(--border-color)",
+                    backgroundColor: "var(--color-warm-grey)",
+                    color: "var(--color-failed)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    border: "1px solid var(--border-color)"
+                  }}
+                >
+                  <LogOut size={14} />
+                  <span>Sign Out Account</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleAuthorize} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+              <h3 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px dotted var(--border-color)", paddingBottom: "0.75rem" }}>
+                🔑 Secure Handshake
+              </h3>
+              
+              <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
+                Click below to sign in with your GitHub account. This will securely authorize your repositories and sync your profile to Supabase.
+              </p>
+
+              {error && (
+                <div style={{
+                  fontSize: "0.75rem",
+                  fontFamily: "monospace",
+                  color: "var(--color-danger)",
+                  border: "1px solid var(--color-danger)",
+                  padding: "0.5rem",
+                  backgroundColor: "rgba(239, 68, 68, 0.05)"
+                }}>
+                  [ERR] {error}
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="brutalist-button"
+                style={{
+                  width: "100%",
+                  justifyContent: "center",
+                  fontSize: "0.85rem",
+                  padding: "0.85rem 1.5rem",
+                  boxShadow: "4px 4px 0px var(--border-color)",
+                  backgroundColor: isLoading ? "var(--color-warm-grey)" : "var(--color-accent)",
+                  color: isLoading ? "var(--text-secondary)" : "#ffffff",
+                  cursor: isLoading ? "not-allowed" : "pointer",
+                  marginTop: "0.5rem"
+                }}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Redirecting to GitHub...</span>
+                  </>
+                ) : (
+                  <>
+                    <Github size={16} />
+                    <span>Authorize GitHub Profile</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
         </div>
 
         {/* Feature Highlights */}

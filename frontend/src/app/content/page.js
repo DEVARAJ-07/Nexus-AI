@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Sparkles, Calendar as CalendarIcon, FileEdit, Check, GitCommit, FileText, Loader2 } from "lucide-react";
+import { API_URL } from "../config";
 
 export default function Content() {
   const [docType, setDocType] = useState("release_notes");
@@ -25,7 +26,7 @@ export default function Content() {
 
     try {
       // Connect to Express backend if online
-      const response = await fetch("http://localhost:5000/api/content/generate", {
+      const response = await fetch(`${API_URL}/api/content/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: docType, topic: commitsSummary, tone }),

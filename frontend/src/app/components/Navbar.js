@@ -22,6 +22,17 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [username, setUsername] = useState("John Doe");
+  const [avatar, setAvatar] = useState("");
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("github_username");
+      const storedAvatar = localStorage.getItem("github_avatar");
+      if (storedUser) setUsername(storedUser);
+      if (storedAvatar) setAvatar(storedAvatar);
+    }
+  }, []);
 
   const navItems = [
     { href: "/dashboard", label: "DASHBOARD", icon: LayoutDashboard },
@@ -124,14 +135,14 @@ export default function Navbar() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <img 
-              src="https://supabase-storage.com/avatars/john.jpg" 
+              src={avatar || "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"} 
               onError={(e) => { e.target.src = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"; }}
               style={{ width: "26px", height: "26px", borderRadius: "50%", border: "1px solid var(--border-color)" }}
               alt="User Avatar"
             />
             <div style={{ display: "flex", flexDirection: "column", maxWidth: "120px" }}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>John Doe</span>
-              <span style={{ fontSize: "0.55rem", color: "var(--text-secondary)", fontFamily: "monospace" }}>ADMINISTRATOR</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{username}</span>
+              <span style={{ fontSize: "0.55rem", color: "var(--text-secondary)", fontFamily: "monospace" }}>DEVELOPER</span>
             </div>
           </div>
           <ChevronUp size={14} style={{ color: "var(--text-secondary)", transform: showProfileMenu ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />

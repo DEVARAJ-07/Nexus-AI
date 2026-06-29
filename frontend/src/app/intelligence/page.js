@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Send, FileUp, Search, Trash2, Cpu, Check, Terminal, Play, Loader2 } from "lucide-react";
+import { API_URL } from "../config";
 
 export default function Intelligence() {
   const [messages, setMessages] = useState([
@@ -9,7 +10,7 @@ export default function Intelligence() {
   ]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("claude-sonnet");
+  const [selectedModel, setSelectedModel] = useState("groq-llama-3.3-70b");
   const [selectedPipeline, setSelectedPipeline] = useState("nexus-auth-service");
   
   // Custom Log Diagnostics states
@@ -25,6 +26,15 @@ export default function Intelligence() {
   const [scanTarget, setScanTarget] = useState("");
   const [scanResult, setScanResult] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+
+  // Database documents list state
+  const [dbDocuments, setDbDocuments] = useState([]);
+
+  // Web Research states
+  const [researchTopic, setResearchTopic] = useState("");
+  const [researchDepth, setResearchDepth] = useState("quick");
+  const [researchResult, setResearchResult] = useState(null);
+  const [isResearching, setIsResearching] = useState(false);
 
   const mockLogs = {
     "log-1": {
@@ -61,7 +71,7 @@ index 6fbffe3..69bfd22 100644
       analysis: "TypeScript cannot infer the types on Express Request body. The Request object should specify a typed interface for req.body to prevent compilation warnings and errors.",
       diff: `diff --git a/backend/src/auth.ts b/backend/src/auth.ts
 index af32b8a..2bc281d 100644
---- b/backend/src/auth.ts
+--- a/backend/src/auth.ts
 +++ b/backend/src/auth.ts
 @@ -8,3 +8,4 @@
 -export function authenticate(req: Request, res: Response) {
@@ -91,7 +101,7 @@ index db838d9..e23df1f 100644
 +++ b/database/.env
 @@ -2,2 +2,2 @@
 -DATABASE_URL="postgresql://postgres:...@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
-+DATABASE_URL="postgresql://postgres:...@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true"`,
+-DATABASE_URL="postgresql://postgres:...@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true"`,
       targetFile: "database/.env",
       cmdLogs: [
         "Reading environment configurations...",
@@ -105,6 +115,37 @@ index db838d9..e23df1f 100644
     }
   };
 
+  const fetchDocuments = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/documents`);
+      if (res.ok) {
+        const data = await res.json();
+        setDbDocuments(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch documents:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+
+    // Check if redirecting from GitHub repository file explorer
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const fileName = params.get("file_name");
+      const filePath = params.get("file_path");
+      if (fileName) {
+        setInput(`Analyze the file "${fileName}" at path "${filePath || ""}" from my repository. What does this code do and are there any bugs or optimization points?`);
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: `[Linked GitHub File: ${fileName} (${filePath || ""})]` },
+          { role: "assistant", content: `I have loaded the file context for **${fileName}**. You can run a prompt to review it, or ask me any questions about this code!` }
+        ]);
+      }
+    }
+  }, []);
+
   const handleSelectLog = (logId) => {
     if (!logId) {
       setSelectedLogId("");
@@ -115,29 +156,69 @@ index db838d9..e23df1f 100644
       return;
     }
     setSelectedLogId(logId);
-    setUploadedLogName(mockLogs[logId].name);
+
+    const mockLog = mockLogs[logId];
+    if (mockLog) {
+      setUploadedLogName(mockLog.name);
+    } else {
+      const dbDoc = dbDocuments.find(d => d.id === logId);
+      setUploadedLogName(dbDoc ? dbDoc.name : "Uploaded Log");
+    }
+
     setDiagnosticStatus("IDLE");
     setPatchApplied(false);
     setPatchLogs([]);
     setActiveAnalysis(null);
   };
 
-  const runDiagnostics = () => {
+  const runDiagnostics = async () => {
     if (!selectedLogId || diagnosticStatus === "RUNNING") return;
     
     setDiagnosticStatus("RUNNING");
+    setActiveAnalysis(null);
+    setPatchApplied(false);
+    setPatchLogs([]);
     
-    // Simulate diagnostic streaming
-    setTimeout(() => {
-      setActiveAnalysis(mockLogs[selectedLogId]);
-      setDiagnosticStatus("COMPLETED");
+    try {
+      // Check if it is a local mock log
+      const mockLog = mockLogs[selectedLogId];
+      if (mockLog) {
+        setTimeout(() => {
+          setActiveAnalysis(mockLog);
+          setDiagnosticStatus("COMPLETED");
+          
+          const newMsg = {
+            role: "assistant",
+            content: `### 🔍 AI Diagnosis for **${mockLog.name}**\n\n**Error Identified:** \`${mockLog.error}\`\n\n**Root Cause Analysis:**\n${mockLog.analysis}\n\nI have generated a target patch file. Check the log diagnostics panel to review and apply the patch.`
+          };
+          setMessages((prev) => [...prev, newMsg]);
+        }, 1500);
+        return;
+      }
+
+      // Call backend live AI diagnostics
+      const res = await fetch(`${API_URL}/api/ai/diagnose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: selectedLogId, model: selectedModel })
+      });
+
+      if (!res.ok) throw new Error("Diagnosis failed");
+      const diagnosis = await res.json();
       
+      setActiveAnalysis(diagnosis);
+      setDiagnosticStatus("COMPLETED");
+
       const newMsg = {
         role: "assistant",
-        content: `### 🔍 AI Diagnosis for **${mockLogs[selectedLogId].name}**\n\n**Error Identified:** \`${mockLogs[selectedLogId].error}\`\n\n**Root Cause Analysis:**\n${mockLogs[selectedLogId].analysis}\n\nI have generated a target patch file. Check the log diagnostics panel to review and apply the patch.`
+        content: `### 🔍 AI Diagnosis for **${uploadedLogName}**\n\n**Error Identified:** \`${diagnosis.error}\`\n\n**Root Cause Analysis:**\n${diagnosis.analysis}\n\nI have generated a target patch file. Check the log diagnostics panel to review and apply the patch.`
       };
       setMessages((prev) => [...prev, newMsg]);
-    }, 1500);
+    } catch (err) {
+      console.error(err);
+      setDiagnosticStatus("IDLE");
+      alert("Failed to run AI diagnostics. Verify your backend is running and your GEMINI_API_KEY is configured.");
+    }
   };
 
   const applyCodePatch = () => {
@@ -173,7 +254,8 @@ index db838d9..e23df1f 100644
     setMessages((prev) => [...prev, assistantMsg]);
 
     try {
-      const response = await fetch(`http://localhost:5000/api/ai/chat-stream?message=${encodeURIComponent(input)}&model=${selectedModel}`);
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("github_username") || "DEVARAJ-07" : "DEVARAJ-07";
+      const response = await fetch(`${API_URL}/api/ai/chat-stream?message=${encodeURIComponent(input)}&model=${selectedModel}&username=${encodeURIComponent(storedUser)}`);
       
       if (!response.ok) throw new Error("Backend offline");
 
@@ -245,28 +327,61 @@ index db838d9..e23df1f 100644
     }, 1200);
   };
 
-  const handleUpload = (e) => {
+  const handleUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setUploadedLogName(file.name);
-      setSelectedLogId("uploaded");
-      setDiagnosticStatus("IDLE");
-      setPatchApplied(false);
-      setPatchLogs([]);
-      setActiveAnalysis({
-        name: file.name,
-        pipeline: selectedPipeline,
-        content: `[Build log file contents read: ${file.name}]\nRunning compilation diagnostics...`,
-        error: "Generic Build Failure",
-        analysis: "Custom uploaded log file. Trigger AI Diagnostics to identify failures.",
-        diff: `diff --git a/custom-patch b/custom-patch\n-  // Error lines parsed\n+  // AI fix placeholder`,
-        targetFile: "Configured target file",
-        cmdLogs: [
-          "Parsing custom log structures...",
-          "Running AI heuristic repair checks...",
-          "Validation completed."
-        ]
+    if (!file) return;
+
+    setUploadedLogName(file.name);
+    setDiagnosticStatus("IDLE");
+    setPatchApplied(false);
+    setPatchLogs([]);
+    setActiveAnalysis(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_URL}/api/documents/upload?name=` + encodeURIComponent(file.name), {
+        method: "POST",
+        body: formData,
       });
+
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      
+      // Refresh documents list
+      await fetchDocuments();
+      
+      // Select the uploaded log
+      setSelectedLogId(data.id);
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Failed to upload document to backend.");
+    }
+  };
+
+  const handleResearch = async (e) => {
+    e.preventDefault();
+    if (!researchTopic.trim() || isResearching) return;
+
+    setIsResearching(true);
+    setResearchResult(null);
+
+    try {
+      const res = await fetch(`${API_URL}/api/ai/research`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: researchTopic, depth: researchDepth, model: selectedModel })
+      });
+
+      if (!res.ok) throw new Error("Research failed");
+      const data = await res.json();
+      setResearchResult(data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to compile research summary.");
+    } finally {
+      setIsResearching(false);
     }
   };
 
@@ -294,9 +409,11 @@ index db838d9..e23df1f 100644
                 className="brutalist-input"
                 style={{ width: "160px", padding: "0.2rem 0.5rem", fontSize: "0.75rem", height: "26px" }}
               >
-                <option value="claude-haiku">Claude 3.5 Haiku</option>
-                <option value="claude-sonnet">Claude 3.5 Sonnet</option>
-                <option value="gpt-4o">GPT-4o Engine</option>
+                <option value="groq-llama-3.3-70b">Llama 3.3 70B (Groq)</option>
+                <option value="openrouter-deepseek/deepseek-r1">DeepSeek R1 (OpenRouter)</option>
+                <option value="openrouter-deepseek/deepseek-chat">DeepSeek V3 (OpenRouter)</option>
+                <option value="openrouter-deepseek-coder">DeepSeek Coder V2 (OpenRouter)</option>
+                <option value="ollama-qwen2.5-coder">Qwen 2.5 Coder (Local Ollama)</option>
               </select>
               <button 
                 onClick={clearChat}
@@ -418,7 +535,7 @@ index db838d9..e23df1f 100644
             </select>
           </div>
 
-          {/* Select Mock Failure */}
+          {/* Select Build Log */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
             <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>SELECT FAILING BUILD LOG</label>
             <select
@@ -427,10 +544,21 @@ index db838d9..e23df1f 100644
               className="brutalist-input"
               style={{ fontSize: "0.75rem", height: "30px", padding: "0.2rem" }}
             >
-              <option value="">-- Choose simulated failure --</option>
-              <option value="log-1">[backend-api] NPM Missing startnode script</option>
-              <option value="log-2">[auth-service] TS2339 Type Error on Body</option>
-              <option value="log-3">[worker-node] PostgreSQL pool timeout</option>
+              <option value="">-- Choose failure log --</option>
+              <optgroup label="Simulated Files">
+                <option value="log-1">[backend-api] NPM Missing startnode script</option>
+                <option value="log-2">[auth-service] TS2339 Type Error on Body</option>
+                <option value="log-3">[worker-node] PostgreSQL pool timeout</option>
+              </optgroup>
+              {dbDocuments.length > 0 && (
+                <optgroup label="Uploaded Documents">
+                  {dbDocuments.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.status})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -441,8 +569,8 @@ index db838d9..e23df1f 100644
 
           <label className="brutalist-button" style={{ width: "100%", cursor: "pointer", display: "flex", justifyContent: "center" }}>
             <FileUp size={14} />
-            <span>Upload Build Log (.log / .txt)</span>
-            <input type="file" onChange={handleUpload} style={{ display: "none" }} accept=".log,.txt" />
+            <span>Upload Build Log / PDF (.log,.txt,.pdf)</span>
+            <input type="file" onChange={handleUpload} style={{ display: "none" }} accept=".log,.txt,.pdf" />
           </label>
 
           {uploadedLogName && (
@@ -514,6 +642,88 @@ index db838d9..e23df1f 100644
               lineHeight: "1.4"
             }}>
               {scanResult}
+            </div>
+          )}
+        </div>
+
+        {/* Web Research Assistant */}
+        <div style={{ border: "1px solid var(--border-color)", padding: "1.25rem", backgroundColor: "var(--color-off-white)" }}>
+          <h4 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", borderBottom: "1px solid var(--color-taupe)", paddingBottom: "0.5rem", marginBottom: "1rem" }}>
+            Web Research Assistant
+          </h4>
+          <form onSubmit={handleResearch} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>RESEARCH TOPIC</label>
+              <input
+                type="text"
+                value={researchTopic}
+                onChange={(e) => setResearchTopic(e.target.value)}
+                placeholder="e.g. Docker caching failure flags"
+                className="brutalist-input"
+                style={{ fontSize: "0.75rem", height: "30px", padding: "0.2rem 0.5rem" }}
+                required
+              />
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>SEARCH DEPTH</label>
+              <select
+                value={researchDepth}
+                onChange={(e) => setResearchDepth(e.target.value)}
+                className="brutalist-input"
+                style={{ fontSize: "0.75rem", height: "30px", padding: "0.2rem" }}
+              >
+                <option value="quick">Quick Summary (30s)</option>
+                <option value="deep">Deep Dive Analysis (2m)</option>
+              </select>
+            </div>
+
+            <button type="submit" className="brutalist-button" disabled={isResearching || !researchTopic}>
+              {isResearching ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Analyzing...
+                </>
+              ) : (
+                <>
+                  <Search size={14} /> Run Web Research
+                </>
+              )}
+            </button>
+          </form>
+
+          {researchResult && (
+            <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{
+                fontSize: "0.75rem",
+                backgroundColor: "var(--color-warm-grey)",
+                padding: "0.75rem",
+                whiteSpace: "pre-wrap",
+                border: "1px solid var(--border-color)",
+                lineHeight: "1.4",
+                maxHeight: "200px",
+                overflowY: "auto"
+              }}>
+                {researchResult.summary}
+              </div>
+              
+              {researchResult.citations && researchResult.citations.length > 0 && (
+                <div style={{ fontSize: "0.65rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>
+                  <strong>Citations:</strong>
+                  <ul style={{ margin: "0.25rem 0", paddingLeft: "1.2rem" }}>
+                    {researchResult.citations.map((cite, i) => (
+                      <li key={i}>
+                        <a href={cite} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent)", textDecoration: "underline" }}>
+                          {cite}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.7rem", color: "var(--color-success)", fontWeight: 700 }}>
+                <Check size={12} /> Auto-saved to Knowledge Base!
+              </div>
             </div>
           )}
         </div>
