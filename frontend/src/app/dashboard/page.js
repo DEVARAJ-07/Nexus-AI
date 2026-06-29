@@ -177,23 +177,12 @@ export default function Dashboard() {
 
   return (
     <div style={{ paddingBottom: "3rem" }}>
-      {/* Dashboard Topbar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 800 }}>Workspace Dashboard</h2>
           <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
             Welcome back, {username || "Developer"}. Unified DevOps command center.
           </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }} className="topbar-meta">
-          {avatar && (
-            <img 
-              src={avatar} 
-              alt="Avatar" 
-              style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid var(--border-color)" }}
-            />
-          )}
-          <span>{username ? `@${username}` : "NEXUS HQ"}</span>
         </div>
       </div>
 
