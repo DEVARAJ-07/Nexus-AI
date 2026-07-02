@@ -47,6 +47,9 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.setItem("nexus_auth", "false");
+    localStorage.removeItem("github_username");
+    localStorage.removeItem("github_avatar");
+    localStorage.removeItem("github_token");
     window.dispatchEvent(new Event("nexus-auth-change"));
     router.replace("/");
   };

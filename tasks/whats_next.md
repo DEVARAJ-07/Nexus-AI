@@ -20,7 +20,7 @@ To run the unified application with a live database:
 1. **Boot Services**: Run `docker-compose up -d` in the root folder to start PostgreSQL and Redis.
 2. **Push DB Schema**: Run `npm run db:push` to sync the Prisma models with the PostgreSQL instance.
 3. **Launch Monorepo**: Run `npm run dev` to start both the Next.js frontend (port 3000) and Express.js API (port 5000) concurrently.
-
+                  
 ---
 
 ## 📋 3. WHAT'S NEXT TO IMPLEMENT

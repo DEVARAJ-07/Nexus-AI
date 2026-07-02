@@ -7,7 +7,8 @@ import { API_URL } from "./config";
 
 export default function LandingPage() {
   const router = useRouter();
-  const [supabaseProjectRef, setSupabaseProjectRef] = useState("nuerryjlhezvihpxhvmo");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
@@ -23,37 +24,40 @@ export default function LandingPage() {
       setIsLoggedIn(auth);
       setStoredUser(user);
     }
-
-    // Fetch configuration from backend on mount to resolve database project ref
-    const fetchConfig = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/auth/github-config`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.supabaseProjectRef) {
-            setSupabaseProjectRef(data.supabaseProjectRef);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load OAuth configuration:", err);
-      }
-    };
-    fetchConfig();
   }, []);
 
-  const handleSupabaseLogin = (e) => {
+  const handleEmailLogin = async (e) => {
     e.preventDefault();
+    if (!email) return;
     setIsLoading(true);
     setError("");
 
-    const redirectUri = `${window.location.origin}/auth/callback`;
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name: name || email.split("@")[0] }),
+      });
 
-    if (supabaseProjectRef) {
-      // Direct Native Supabase GoTrue Auth redirection with repository scope
-      const oauthUrl = `https://${supabaseProjectRef}.supabase.co/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(redirectUri)}&scopes=repo`;
-      window.location.href = oauthUrl;
-    } else {
-      setError("Supabase project reference is not configured on the backend server.");
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Login failed");
+      }
+
+      const data = await res.json();
+      const { user } = data;
+
+      localStorage.setItem("nexus_auth", "true");
+      localStorage.setItem("github_username", user.name);
+      localStorage.setItem("github_avatar", user.avatarUrl || "");
+      localStorage.setItem("github_token", "");
+
+      window.dispatchEvent(new Event("nexus-auth-change"));
+      router.replace("/dashboard");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(err.message || "Failed to log in.");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -216,13 +220,13 @@ export default function LandingPage() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSupabaseLogin} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+            <form onSubmit={handleEmailLogin} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
               <h3 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px dotted var(--border-color)", paddingBottom: "0.75rem" }}>
-                🔑 Secure Handshake
+                🔑 Account Gateway
               </h3>
               
               <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
-                Sign in securely via Supabase Auth to connect your GitHub profile and sync your workspace repositories.
+                Enter your email address to log in to the pipeline command center workspace.
               </p>
 
               {error && (
@@ -238,6 +242,51 @@ export default function LandingPage() {
                 </div>
               )}
 
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "left" }}>
+                <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. developer@nexus-ci.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  style={{
+                    padding: "0.6rem 0.8rem",
+                    fontSize: "0.8rem",
+                    fontFamily: "monospace",
+                    border: "1px solid var(--border-color)",
+                    backgroundColor: "var(--color-off-white)",
+                    color: "var(--text-primary)",
+                    width: "100%",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "left" }}>
+                <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>
+                  Display Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  style={{
+                    padding: "0.6rem 0.8rem",
+                    fontSize: "0.8rem",
+                    fontFamily: "monospace",
+                    border: "1px solid var(--border-color)",
+                    backgroundColor: "var(--color-off-white)",
+                    color: "var(--text-primary)",
+                    width: "100%",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+
               <button 
                 type="submit" 
                 disabled={isLoading}
@@ -251,18 +300,20 @@ export default function LandingPage() {
                   backgroundColor: isLoading ? "var(--color-warm-grey)" : "var(--color-accent)",
                   color: isLoading ? "var(--text-secondary)" : "#ffffff",
                   cursor: isLoading ? "not-allowed" : "pointer",
-                  marginTop: "0.5rem"
+                  marginTop: "0.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem"
                 }}
               >
                 {isLoading ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Redirecting to GitHub...</span>
+                    <span>Signing In...</span>
                   </>
                 ) : (
                   <>
-                    <Github size={16} />
-                    <span>Continue with GitHub</span>
+                    <span>Sign In to Workspace</span>
                     <ArrowRight size={14} />
                   </>
                 )}
