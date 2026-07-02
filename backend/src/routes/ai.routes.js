@@ -10,7 +10,7 @@ const openrouterService = require("../services/openrouter.service");
 router.get("/chat-stream", async (req, res) => {
   const message = req.query.message || "Hello";
   const model = req.query.model || "groq-llama-3.3-70b";
-  const username = req.query.username || "DEVARAJ-07";
+  const username = req.query.username || "Developer";
   const chatId = req.query.chatId;
 
   res.setHeader("Content-Type", "text/event-stream");
