@@ -1,0 +1,335 @@
+﻿datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// CORE MODULE MODELS
+// ==========================================
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  avatarUrl     String?        @map("avatar_url")
+  workspaceId   String?        @map("workspace_id")
+  role          String         @default("MEMBER") // Admin / Member / Viewer
+  createdAt     DateTime       @default(now()) @map("created_at")
+  workspace     Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  notes         Note[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id             String          @id @default(uuid())
+  name           String
+  logoUrl        String?         @map("logo_url")
+  industry       String?
+  plan           String          @default("FREE") // FREE / PRO / TEAM
+  createdAt      DateTime        @default(now()) @map("created_at")
+  users          User[]
+  invites        Invite[]
+  conversations  Conversation[]
+  documents      Document[]
+  knowledgeItems KnowledgeItem[]
+  prompts        Prompt[]
+  contentPieces  ContentPiece[]
+  templates      ContentTemplate[]
+  brandVoices    BrandVoice[]
+  contacts       Contact[]
+  companies      Company[]
+  analyticsEvents AnalyticsEvent[]
+  reports        Report[]
+  workflows      Workflow[]
+  integrations   Integration[]
+  apiKeys        ApiKey[]
+  webhooks       Webhook[]
+
+  @@map("workspaces")
+}
+
+model Invite {
+  id          String    @id @default(uuid())
+  email       String
+  workspaceId String    @map("workspace_id")
+  role        String    @default("MEMBER")
+  token       String    @unique
+  expiresAt   DateTime  @map("expires_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("invites")
+}
+
+// ==========================================
+// MODULE 1: INTELLIGENCE HUB
+// ==========================================
+
+model Conversation {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  title       String
+  workspaceId String    @map("workspace_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  role           String       // user / assistant
+  content        String
+  createdAt      DateTime     @default(now()) @map("created_at")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Document {
+  id          String    @id @default(uuid())
+  name        String
+  fileUrl     String    @map("file_url")
+  status      String    @default("PROCESSING") // PROCESSING / READY / ERROR
+  workspaceId String    @map("workspace_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model KnowledgeItem {
+  id          String    @id @default(uuid())
+  title       String
+  content     String
+  tags        String[]
+  vectorId    String?   @map("vector_id")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("knowledge_items")
+}
+
+model Prompt {
+  id          String    @id @default(uuid())
+  title       String
+  content     String
+  category    String
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("prompts")
+}
+
+// ==========================================
+// MODULE 2: CONTENT STUDIO
+// ==========================================
+
+model ContentPiece {
+  id          String    @id @default(uuid())
+  type        String    // blog / social / email / ad
+  title       String
+  body        String
+  status      String    @default("DRAFT") // DRAFT / SCHEDULED / PUBLISHED
+  scheduledAt DateTime? @map("scheduled_at")
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("content_pieces")
+}
+
+model ContentTemplate {
+  id          String    @id @default(uuid())
+  name        String
+  type        String
+  formConfig  String    @map("form_config") // JSON string configuration
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("content_templates")
+}
+
+model BrandVoice {
+  id           String    @id @default(uuid())
+  workspaceId  String    @unique @map("workspace_id")
+  tone         String[]
+  vocabulary   String[]
+  styleProfile String    @map("style_profile")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("brand_voices")
+}
+
+// ==========================================
+// MODULE 3: CRM & LEAD ENGINE
+// ==========================================
+
+model Contact {
+  id          String     @id @default(uuid())
+  name        String
+  email       String
+  phone       String?
+  companyId   String?    @map("company_id")
+  stage       String     @default("NEW") // NEW / CONTACTED / QUALIFIED / PROPOSAL / WON / LOST
+  score       Int        @default(0) // AI Lead Score 1-100
+  source      String?
+  workspaceId String     @map("workspace_id")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  company     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  notes       Note[]
+  activities  Activity[]
+
+  @@map("contacts")
+}
+
+model Company {
+  id          String    @id @default(uuid())
+  name        String
+  website     String?
+  industry    String?
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contacts    Contact[]
+
+  @@map("companies")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  contactId String   @map("contact_id")
+  content   String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  contactId   String   @map("contact_id")
+  type        String   // call / email / meeting / stage_change
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("activities")
+}
+
+// ==========================================
+// MODULE 4: ANALYTICS COMMAND CENTER
+// ==========================================
+
+model AnalyticsEvent {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  eventType   String    @map("event_type")
+  payload     String    // JSON string payload
+  createdAt   DateTime  @default(now()) @map("created_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("analytics_events")
+}
+
+model Report {
+  id          String    @id @default(uuid())
+  name        String
+  config      String    // JSON config string
+  schedule    String?   // cron expression or interval
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+// ==========================================
+// MODULE 5: AUTOMATION FORGE
+// ==========================================
+
+model Workflow {
+  id            String        @id @default(uuid())
+  name          String
+  triggerConfig String        @map("trigger_config") // JSON trigger config
+  stepsJson     String        @map("steps_json") // JSON steps configuration
+  status        String        @default("INACTIVE") // ACTIVE / INACTIVE
+  workspaceId   String        @map("workspace_id")
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runs          WorkflowRun[]
+
+  @@map("workflows")
+}
+
+model WorkflowRun {
+  id         String   @id @default(uuid())
+  workflowId String   @map("workflow_id")
+  status     String   @default("RUNNING") // RUNNING / COMPLETED / FAILED
+  startedAt  DateTime @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  logJson    String?  @map("log_json") // JSON execution log
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_runs")
+}
+
+// ==========================================
+// MODULE 6: INTEGRATION GATEWAY
+// ==========================================
+
+model Integration {
+  id           String    @id @default(uuid())
+  workspaceId  String    @map("workspace_id")
+  provider     String    // Slack / Notion / Google / HubSpot
+  accessToken  String?   @map("access_token")
+  refreshToken String?   @map("refresh_token")
+  status       String    @default("INACTIVE") // ACTIVE / INACTIVE / ERROR
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  syncLogs     SyncLog[]
+
+  @@map("integrations")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  name        String
+  keyHash     String    @map("key_hash")
+  permissions String[]  // read / write / admin
+  lastUsedAt  DateTime? @map("last_used_at")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model Webhook {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  type        String    // inbound / outbound
+  url         String
+  events      String[]
+  secret      String?
+  status      String    @default("ACTIVE") // ACTIVE / INACTIVE
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
+model SyncLog {
+  id            String      @id @default(uuid())
+  integrationId String      @map("integration_id")
+  status        String      // SUCCESS / ERROR
+  message       String
+  createdAt     DateTime    @default(now()) @map("created_at")
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("sync_logs")
+}

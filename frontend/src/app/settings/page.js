@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { CreditCard, Users, Trash2, Save, Check } from "lucide-react";
+import { API_URL } from "../config";
 
 export default function Settings() {
   const [profileName, setProfileName] = useState("John Doe");
@@ -24,20 +25,20 @@ export default function Settings() {
   useEffect(() => {
     async function loadData() {
       try {
-        const profileRes = await fetch("http://localhost:5000/api/settings/profile");
+        const profileRes = await fetch(`${API_URL}/api/settings/profile`);
         if (profileRes.ok) {
           const profileData = await profileRes.json();
           setProfileName(profileData.name || "John Doe");
           setProfileEmail(profileData.email || "john@nexus-ci.com");
         }
 
-        const wsRes = await fetch("http://localhost:5000/api/settings/workspace");
+        const wsRes = await fetch(`${API_URL}/api/settings/workspace`);
         if (wsRes.ok) {
           const wsData = await wsRes.json();
           setOrgName(wsData.name || "Nexus Headquarters");
         }
 
-        const teamRes = await fetch("http://localhost:5000/api/settings/team");
+        const teamRes = await fetch(`${API_URL}/api/settings/team`);
         if (teamRes.ok) {
           const teamData = await teamRes.json();
           setTeam(teamData);
@@ -55,7 +56,7 @@ export default function Settings() {
     setSavingProfile(true);
     setSavedProfile(false);
     try {
-      const res = await fetch("http://localhost:5000/api/settings/profile", {
+      const res = await fetch(`${API_URL}/api/settings/profile`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: profileName, email: profileEmail })
@@ -76,7 +77,7 @@ export default function Settings() {
     setSavingOrg(true);
     setSavedOrg(false);
     try {
-      const res = await fetch("http://localhost:5000/api/settings/workspace", {
+      const res = await fetch(`${API_URL}/api/settings/workspace`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: orgName })
@@ -97,7 +98,7 @@ export default function Settings() {
     if (!inviteEmail) return;
 
     try {
-      const res = await fetch("http://localhost:5000/api/settings/team/invite", {
+      const res = await fetch(`${API_URL}/api/settings/team/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: inviteEmail, role: inviteRole })
@@ -125,7 +126,7 @@ export default function Settings() {
 
   const handleRevoke = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/settings/team/${id}`, {
+      const res = await fetch(`${API_URL}/api/settings/team/${id}`, {
         method: "DELETE"
       });
       if (res.ok) {

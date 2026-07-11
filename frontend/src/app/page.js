@@ -7,8 +7,9 @@ import { API_URL } from "./config";
 
 export default function LandingPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const [email, setEmail] = useState("DEVARAJ-07@github.com");
+  const [name, setName] = useState("DEVARAJ-07");
+  const [supabaseProjectRef, setSupabaseProjectRef] = useState("nuerryjlhezvihpxhvmo");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
@@ -24,7 +25,40 @@ export default function LandingPage() {
       setIsLoggedIn(auth);
       setStoredUser(user);
     }
+
+    // Fetch configuration from backend on mount
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/github-config`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.supabaseProjectRef) {
+            setSupabaseProjectRef(data.supabaseProjectRef);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load OAuth configuration:", err);
+      }
+    };
+    fetchConfig();
   }, []);
+
+  const handleSupabaseLogin = (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    const redirectUri = `${window.location.origin}/auth/callback`;
+
+    if (supabaseProjectRef) {
+      // Direct Native Supabase GoTrue Auth redirection with repository scope and forced account selection prompt
+      const oauthUrl = `https://${supabaseProjectRef}.supabase.co/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(redirectUri)}&scopes=repo&queryParams=${encodeURIComponent("prompt=select_account")}`;
+      window.location.href = oauthUrl;
+    } else {
+      setError("Supabase project reference is not configured on the backend server.");
+      setIsLoading(false);
+    }
+  };
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -49,7 +83,7 @@ export default function LandingPage() {
 
       localStorage.setItem("nexus_auth", "true");
       localStorage.setItem("github_username", user.name);
-      localStorage.setItem("github_avatar", user.avatarUrl || "");
+      localStorage.setItem("github_avatar", user.avatarUrl || "https://avatars.githubusercontent.com/u/211518264?v=4");
       localStorage.setItem("github_token", "");
 
       window.dispatchEvent(new Event("nexus-auth-change"));
@@ -220,13 +254,13 @@ export default function LandingPage() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleEmailLogin} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
               <h3 style={{ fontFamily: "monospace", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px dotted var(--border-color)", paddingBottom: "0.75rem" }}>
-                🔑 Account Gateway
+                🔑 Developer Access Control
               </h3>
               
               <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
-                Enter your email address to log in to the pipeline command center workspace.
+                Sign in securely via GitHub OAuth, or enter your credentials manually to access the DevOps forge workspace.
               </p>
 
               {error && (
@@ -242,83 +276,119 @@ export default function LandingPage() {
                 </div>
               )}
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "left" }}>
-                <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  placeholder="e.g. developer@nexus-ci.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  style={{
-                    padding: "0.6rem 0.8rem",
-                    fontSize: "0.8rem",
-                    fontFamily: "monospace",
-                    border: "1px solid var(--border-color)",
-                    backgroundColor: "var(--color-off-white)",
-                    color: "var(--text-primary)",
-                    width: "100%",
-                    boxSizing: "border-box"
-                  }}
-                />
-              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+                {/* Method A: Supabase GitHub OAuth */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  <button 
+                    onClick={handleSupabaseLogin}
+                    disabled={isLoading}
+                    className="brutalist-button"
+                    style={{
+                      width: "100%",
+                      justifyContent: "center",
+                      fontSize: "0.85rem",
+                      padding: "0.85rem 1.5rem",
+                      boxShadow: "4px 4px 0px var(--border-color)",
+                      backgroundColor: isLoading ? "var(--color-warm-grey)" : "var(--color-accent)",
+                      color: "#ffffff",
+                      cursor: isLoading ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem"
+                    }}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Redirecting to GitHub...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Github size={16} />
+                        <span>Continue with GitHub</span>
+                        <ArrowRight size={14} />
+                      </>
+                    )}
+                  </button>
+                </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "left" }}>
-                <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>
-                  Display Name (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={{
-                    padding: "0.6rem 0.8rem",
-                    fontSize: "0.8rem",
-                    fontFamily: "monospace",
-                    border: "1px solid var(--border-color)",
-                    backgroundColor: "var(--color-off-white)",
-                    color: "var(--text-primary)",
-                    width: "100%",
-                    boxSizing: "border-box"
-                  }}
-                />
-              </div>
+                <div style={{ display: "flex", alignItems: "center", margin: "0.25rem 0" }}>
+                  <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)", opacity: 0.5 }} />
+                  <span style={{ fontSize: "0.65rem", padding: "0 0.5rem", color: "var(--text-secondary)", fontFamily: "monospace" }}>OR</span>
+                  <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)", opacity: 0.5 }} />
+                </div>
 
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="brutalist-button"
-                style={{
-                  width: "100%",
-                  justifyContent: "center",
-                  fontSize: "0.85rem",
-                  padding: "0.85rem 1.5rem",
-                  boxShadow: "4px 4px 0px var(--border-color)",
-                  backgroundColor: isLoading ? "var(--color-warm-grey)" : "var(--color-accent)",
-                  color: isLoading ? "var(--text-secondary)" : "#ffffff",
-                  cursor: isLoading ? "not-allowed" : "pointer",
-                  marginTop: "0.5rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem"
-                }}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Signing In...</span>
-                  </>
-                ) : (
-                  <>
+                {/* Method B: Email Gateway */}
+                <form onSubmit={handleEmailLogin} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", textAlign: "left" }}>
+                    <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)", fontWeight: "bold" }}>
+                      ✉️ Sign In with Email
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="e.g. developer@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      style={{
+                        padding: "0.6rem 0.8rem",
+                        fontSize: "0.8rem",
+                        fontFamily: "monospace",
+                        border: "1px solid var(--border-color)",
+                        backgroundColor: "var(--color-off-white)",
+                        color: "var(--text-primary)",
+                        width: "100%",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", textAlign: "left" }}>
+                    <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)", fontWeight: "bold" }}>
+                      Display Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. John Doe"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      style={{
+                        padding: "0.6rem 0.8rem",
+                        fontSize: "0.8rem",
+                        fontFamily: "monospace",
+                        border: "1px solid var(--border-color)",
+                        backgroundColor: "var(--color-off-white)",
+                        color: "var(--text-primary)",
+                        width: "100%",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={isLoading}
+                    className="brutalist-button"
+                    style={{
+                      width: "100%",
+                      justifyContent: "center",
+                      fontSize: "0.8rem",
+                      padding: "0.65rem 1rem",
+                      boxShadow: "3px 3px 0px var(--border-color)",
+                      backgroundColor: "var(--color-accent)",
+                      color: "#ffffff",
+                      cursor: isLoading ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem"
+                    }}
+                  >
+                    {isLoading && <Loader2 size={12} className="animate-spin" />}
                     <span>Sign In to Workspace</span>
-                    <ArrowRight size={14} />
-                  </>
-                )}
-              </button>
-            </form>
+                  </button>
+                </form>
+              </div>
+            </div>
           )}
         </div>
 

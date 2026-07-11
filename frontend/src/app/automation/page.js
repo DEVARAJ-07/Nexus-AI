@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Plus, ToggleLeft, ToggleRight, Info, Play, Loader2, RefreshCw } from "lucide-react";
+import { API_URL } from "../config";
 
 export default function Automation() {
   const [workflows, setWorkflows] = useState([
@@ -20,7 +21,7 @@ export default function Automation() {
   useEffect(() => {
     async function loadWorkflows() {
       try {
-        const res = await fetch("http://localhost:5000/api/automation");
+        const res = await fetch(`${API_URL}/api/automation`);
         if (res.ok) {
           const data = await res.json();
           setWorkflows(data);
@@ -40,7 +41,7 @@ export default function Automation() {
     );
 
     try {
-      await fetch(`http://localhost:5000/api/automation/${id}`, {
+      await fetch(`${API_URL}/api/automation/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus })
@@ -62,7 +63,7 @@ export default function Automation() {
     };
 
     try {
-      const res = await fetch("http://localhost:5000/api/automation", {
+      const res = await fetch(`${API_URL}/api/automation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -90,7 +91,7 @@ export default function Automation() {
     setTestingWfId(id);
     setExecutionTrace(null);
     try {
-      const res = await fetch(`http://localhost:5000/api/automation/${id}/test`, {
+      const res = await fetch(`${API_URL}/api/automation/${id}/test`, {
         method: "POST"
       });
       if (res.ok) {
