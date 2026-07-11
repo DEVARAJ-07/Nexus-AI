@@ -5,12 +5,15 @@ const geminiService = require("../services/gemini.service");
 const groqService = require("../services/groq.service");
 const ollamaService = require("../services/ollama.service");
 const openrouterService = require("../services/openrouter.service");
+const fs = require("fs");
+const path = require("path");
+const mockDocuments = require("../config/documentsStore");
 
 // SSE Stream for AI Chat with DB query caching and history logging
 router.get("/chat-stream", async (req, res) => {
   const message = req.query.message || "Hello";
   const model = req.query.model || "groq-llama-3.3-70b";
-  const username = req.query.username || "Developer";
+  const username = req.query.username || "DEVARAJ-07";
   const chatId = req.query.chatId;
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -150,20 +153,32 @@ Analyze all diagnostic, code pipeline, and log questions directly and with code 
 // Run Build Log Diagnostics & Code Patch Generation
 router.post("/diagnose", async (req, res) => {
   try {
-    const { logText, model } = req.body;
-    if (!logText) {
+    const { logText, documentId, model } = req.body;
+    let textToDiagnose = logText;
+
+    if (documentId) {
+      const doc = mockDocuments.find(d => d.id === documentId);
+      if (doc) {
+        const filePath = path.join(__dirname, "../../../", doc.fileUrl);
+        if (fs.existsSync(filePath)) {
+          textToDiagnose = fs.readFileSync(filePath, "utf-8");
+        }
+      }
+    }
+
+    if (!textToDiagnose) {
       return res.status(400).json({ error: "No log content available for diagnosis." });
     }
 
     let diagnosis;
     if (model && model.startsWith("groq-")) {
-      diagnosis = await groqService.diagnoseLog(model, logText);
+      diagnosis = await groqService.diagnoseLog(model, textToDiagnose);
     } else if (model && model.startsWith("ollama-")) {
-      diagnosis = await ollamaService.diagnoseLog(model, logText);
+      diagnosis = await ollamaService.diagnoseLog(model, textToDiagnose);
     } else if (model && model.startsWith("openrouter-")) {
-      diagnosis = await openrouterService.diagnoseLog(model, logText);
+      diagnosis = await openrouterService.diagnoseLog(model, textToDiagnose);
     } else {
-      diagnosis = await geminiService.diagnoseLog(logText);
+      diagnosis = await geminiService.diagnoseLog(textToDiagnose);
     }
     
     res.status(200).json(diagnosis);

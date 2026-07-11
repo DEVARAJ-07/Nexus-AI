@@ -17,14 +17,14 @@ export default function ClientAppShell({ children }) {
     setIsAuthenticated(auth);
 
     // Route guard: unauthenticated users → landing page
-    if (!auth && pathname !== "/") {
+    if (!auth && pathname !== "/" && pathname !== "/auth/callback") {
       router.replace("/");
       return;
     }
 
-    // Route guard: authenticated users must never see the landing page
+    // Route guard: authenticated users must never see the landing page or callback page
     // replace() removes it from history so back-button navigation skips it
-    if (auth && pathname === "/") {
+    if (auth && (pathname === "/" || pathname === "/auth/callback")) {
       router.replace("/dashboard");
     }
   }, [pathname, router]);
@@ -49,7 +49,7 @@ export default function ClientAppShell({ children }) {
     return <div style={{ backgroundColor: "#0b0f19", minHeight: "100vh" }} />;
   }
 
-  const showLayout = isAuthenticated && pathname !== "/";
+  const showLayout = isAuthenticated && pathname !== "/" && pathname !== "/auth/callback";
 
   if (!showLayout) {
     return (

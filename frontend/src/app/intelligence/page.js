@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Send, FileUp, Search, Trash2, Cpu, Check, Terminal, Play, Loader2 } from "lucide-react";
 import { API_URL } from "../config";
 
@@ -12,6 +12,13 @@ export default function Intelligence() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [selectedModel, setSelectedModel] = useState("groq-llama-3.3-70b");
   const [selectedPipeline, setSelectedPipeline] = useState("nexus-auth-service");
+  
+  // Ref for auto-scrolling
+  const messagesEndRef = useRef(null);
+
+  // Logged-in profile states
+  const [username, setUsername] = useState("DEVARAJ-07");
+  const [avatar, setAvatar] = useState("https://avatars.githubusercontent.com/u/211518264?v=4");
   
   // Custom Log Diagnostics states
   const [selectedLogId, setSelectedLogId] = useState("");
@@ -132,10 +139,19 @@ index db838d9..e23df1f 100644
 
     // Check if redirecting from GitHub repository file explorer
     if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("github_username") || "DEVARAJ-07";
+      const storedAvatar = localStorage.getItem("github_avatar") || "https://avatars.githubusercontent.com/u/211518264?v=4";
+      setUsername(storedUser);
+      setAvatar(storedAvatar);
+
       const params = new URLSearchParams(window.location.search);
       const fileName = params.get("file_name");
       const filePath = params.get("file_path");
       if (fileName) {
+        // Clean URL parameters immediately to avoid double loading (e.g. React Strict Mode)
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+
         setInput(`Analyze the file "${fileName}" at path "${filePath || ""}" from my repository. What does this code do and are there any bugs or optimization points?`);
         setMessages((prev) => [
           ...prev,
@@ -145,6 +161,14 @@ index db838d9..e23df1f 100644
       }
     }
   }, []);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isStreaming]);
 
   const handleSelectLog = (logId) => {
     if (!logId) {
@@ -254,7 +278,7 @@ index db838d9..e23df1f 100644
     setMessages((prev) => [...prev, assistantMsg]);
 
     try {
-      const storedUser = typeof window !== "undefined" ? localStorage.getItem("github_username") || "Developer" : "Developer";
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("github_username") || "DEVARAJ-07" : "DEVARAJ-07";
       const response = await fetch(`${API_URL}/api/ai/chat-stream?message=${encodeURIComponent(input)}&model=${selectedModel}&username=${encodeURIComponent(storedUser)}`);
       
       if (!response.ok) throw new Error("Backend offline");
@@ -425,13 +449,101 @@ index db838d9..e23df1f 100644
             </div>
           </div>
 
-          <div className="chat-messages" style={{ height: "350px" }}>
+          <div className="chat-messages" style={{ height: "450px" }}>
             {messages.map((m, idx) => (
-              <div key={idx} className={`chat-bubble ${m.role}`}>
-                <strong>{m.role === "user" ? "DEVELOPER" : "NEXUS_AI"}:</strong>
-                <div style={{ marginTop: "0.25rem", whiteSpace: "pre-wrap" }}>{m.content}</div>
+              <div 
+                key={idx} 
+                className={`chat-bubble-wrapper ${m.role}`} 
+                style={{
+                  display: "flex",
+                  gap: "0.75rem",
+                  alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                  maxWidth: "85%",
+                  flexDirection: m.role === "user" ? "row-reverse" : "row",
+                  alignItems: "flex-start",
+                  marginBottom: "0.25rem"
+                }}
+              >
+                {/* Avatar */}
+                {m.role === "user" ? (
+                  <img 
+                    src={avatar} 
+                    alt={username} 
+                    style={{ width: "30px", height: "30px", borderRadius: "50%", border: "1px solid var(--border-color)", flexShrink: 0 }} 
+                  />
+                ) : (
+                  <div 
+                    style={{
+                      width: "30px",
+                      height: "30px",
+                      borderRadius: "50%",
+                      backgroundColor: "var(--color-slate)",
+                      color: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "1px solid var(--border-color)",
+                      flexShrink: 0
+                    }}
+                  >
+                    <Cpu size={14} />
+                  </div>
+                )}
+
+                {/* Bubble */}
+                <div className={`chat-bubble ${m.role}`} style={{ width: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem", borderBottom: "1px dotted var(--border-color)", paddingBottom: "0.15rem", opacity: 0.85 }}>
+                    <strong style={{ fontFamily: "monospace", fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      {m.role === "user" ? username : "NEXUS_AI"}
+                    </strong>
+                  </div>
+                  <div style={{ marginTop: "0.25rem", whiteSpace: "pre-wrap", fontSize: "0.78rem", lineHeight: "1.45" }}>{m.content}</div>
+                </div>
               </div>
             ))}
+            
+            {isStreaming && (
+              <div 
+                className="chat-bubble-wrapper assistant" 
+                style={{
+                  display: "flex",
+                  gap: "0.75rem",
+                  alignSelf: "flex-start",
+                  maxWidth: "85%",
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  marginBottom: "0.25rem"
+                }}
+              >
+                <div 
+                  style={{
+                    width: "30px",
+                    height: "30px",
+                    borderRadius: "50%",
+                    backgroundColor: "var(--color-slate)",
+                    color: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "1px solid var(--border-color)",
+                    flexShrink: 0
+                  }}
+                >
+                  <Cpu size={14} />
+                </div>
+                <div className="chat-bubble assistant" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <strong style={{ fontFamily: "monospace", fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.85 }}>
+                    NEXUS_AI
+                  </strong>
+                  <div className="typing-dots" style={{ marginLeft: "0.5rem" }}>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
 
           <form onSubmit={handleSend} style={{ display: "flex", gap: "10px" }}>
