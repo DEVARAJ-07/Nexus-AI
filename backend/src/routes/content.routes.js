@@ -46,21 +46,21 @@ router.post("/generate", async (req, res) => {
     const workspaceId = await getWorkspaceId(req);
     const voice = await prisma.brandVoice.findUnique({
       where: { workspaceId },
-    });
+    }).catch(() => null);
 
     const systemPrompt = `You are a professional technical writer and devops release manager.
 Generate documentation of type "${type || "release_notes"}" in HTML format.
 Tone: ${tone || "Technical"}.
 ${voice ? `Brand Guidelines:
 - Style Profile: ${voice.styleProfile}
-- Tone attributes: ${voice.tone.join(", ")}
-- Allowed vocab: ${voice.vocabulary.join(", ")}` : ""}
+- Tone attributes: ${Array.isArray(voice.tone) ? voice.tone.join(", ") : voice.tone}
+- Allowed vocab: ${Array.isArray(voice.vocabulary) ? voice.vocabulary.join(", ") : voice.vocabulary}` : ""}
 
 Only return HTML elements (e.g., <h1>, <p>, <ul>, <li>, <em>, <strong>, <pre><code>). Do not wrap with markdown code blocks (e.g., \`\`\`html).`;
 
     const userPrompt = `Generate release details based on the following topic or commit logs: "${topic}".`;
 
-    const isMockKey = !env.CLAUDE_API_KEY || env.CLAUDE_API_KEY === "claude_mock_api_key_4082" || env.CLAUDE_API_KEY.includes("mock");
+    const isMockKey = !env.CLAUDE_API_KEY || env.CLAUDE_API_KEY.includes("mock") || env.CLAUDE_API_KEY.includes("placeholder");
 
     if (!isMockKey) {
       try {
@@ -98,9 +98,7 @@ Only return HTML elements (e.g., <h1>, <p>, <ul>, <li>, <em>, <strong>, <pre><co
                 if (parsed.type === "content_block_delta" && parsed.delta && parsed.delta.text) {
                   res.write(`data: ${JSON.stringify({ token: parsed.delta.text })}\n\n`);
                 }
-              } catch (e) {
-                // Incomplete chunk - ignore parse error
-              }
+              } catch (e) {}
             }
           }
         });
@@ -119,7 +117,6 @@ Only return HTML elements (e.g., <h1>, <p>, <ul>, <li>, <em>, <strong>, <pre><co
       }
     }
 
-    // Fallback stream generator
     const streamText = `<h1>Release Notes</h1><p>Generated under ${tone || "Technical"} format for commits: <em>${topic}</em>.</p><p>Nexus AI successfully compiled release details and repository build changelogs using fallback generation. To run with Claude, set a valid \`CLAUDE_API_KEY\` in \`backend/.env\`.</p>`;
     const words = streamText.split(" ");
     let idx = 0;
@@ -140,7 +137,7 @@ Only return HTML elements (e.g., <h1>, <p>, <ul>, <li>, <em>, <strong>, <pre><co
     });
 
   } catch (error) {
-    console.error("Content generate stream error:", error);
+    console.error("Content generate stream error:", error.message);
     res.write(`data: ${JSON.stringify({ token: "<p>Error generating stream content.</p>" })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
@@ -153,14 +150,14 @@ router.get("/", async (req, res) => {
     const workspaceId = await getWorkspaceId(req);
     const items = await prisma.contentPiece.findMany({
       where: { workspaceId },
-    });
+      orderBy: { createdAt: "desc" }
+    }).catch(() => []);
 
     if (items.length > 0) {
       return res.status(200).json(items);
     }
     res.status(200).json(contentPieces);
   } catch (err) {
-    console.warn("[DB_FALLBACK] get content failed, using mock:", err.message);
     res.status(200).json(contentPieces);
   }
 });
@@ -171,7 +168,7 @@ router.get("/:id", async (req, res) => {
   try {
     const piece = await prisma.contentPiece.findUnique({
       where: { id },
-    });
+    }).catch(() => null);
     if (piece) {
       return res.status(200).json(piece);
     }
@@ -179,7 +176,6 @@ router.get("/:id", async (req, res) => {
     if (!mockPiece) return res.status(404).json({ error: "Content not found" });
     res.status(200).json(mockPiece);
   } catch (err) {
-    console.warn("[DB_FALLBACK] get content/:id failed, using mock:", err.message);
     const mockPiece = contentPieces.find(c => c.id === id);
     if (!mockPiece) return res.status(404).json({ error: "Content not found" });
     res.status(200).json(mockPiece);
@@ -191,7 +187,7 @@ router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const { title, body, status } = req.body;
   try {
-    const piece = await prisma.contentPiece.findUnique({ where: { id } });
+    const piece = await prisma.contentPiece.findUnique({ where: { id } }).catch(() => null);
     if (piece) {
       const updated = await prisma.contentPiece.update({
         where: { id },
@@ -215,7 +211,6 @@ router.patch("/:id", async (req, res) => {
     };
     res.status(200).json(contentPieces[index]);
   } catch (err) {
-    console.warn("[DB_FALLBACK] patch content failed, using mock:", err.message);
     const index = contentPieces.findIndex(c => c.id === id);
     if (index === -1) return res.status(404).json({ error: "Content not found" });
     contentPieces[index] = {
@@ -232,49 +227,12 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const piece = await prisma.contentPiece.findUnique({ where: { id } });
-    if (piece) {
-      await prisma.contentPiece.delete({ where: { id } });
-    }
+    await prisma.contentPiece.delete({ where: { id } }).catch(() => null);
     contentPieces = contentPieces.filter(c => c.id !== id);
     res.status(200).json({ message: "Content deleted" });
   } catch (err) {
-    console.warn("[DB_FALLBACK] delete content failed, using mock:", err.message);
     contentPieces = contentPieces.filter(c => c.id !== id);
     res.status(200).json({ message: "Content deleted" });
-  }
-});
-
-// Schedule content piece
-router.patch("/:id/schedule", async (req, res) => {
-  const { id } = req.params;
-  const { date } = req.body;
-  try {
-    const piece = await prisma.contentPiece.findUnique({ where: { id } });
-    if (piece) {
-      const updated = await prisma.contentPiece.update({
-        where: { id },
-        data: {
-          scheduledAt: date ? new Date(date) : null,
-          status: "SCHEDULED"
-        }
-      });
-      const index = contentPieces.findIndex(c => c.id === id);
-      if (index !== -1) contentPieces[index] = updated;
-      return res.status(200).json(updated);
-    }
-    const index = contentPieces.findIndex(c => c.id === id);
-    if (index === -1) return res.status(404).json({ error: "Content not found" });
-    contentPieces[index].scheduledAt = date;
-    contentPieces[index].status = "SCHEDULED";
-    res.status(200).json(contentPieces[index]);
-  } catch (err) {
-    console.warn("[DB_FALLBACK] schedule content failed, using mock:", err.message);
-    const index = contentPieces.findIndex(c => c.id === id);
-    if (index === -1) return res.status(404).json({ error: "Content not found" });
-    contentPieces[index].scheduledAt = date;
-    contentPieces[index].status = "SCHEDULED";
-    res.status(200).json(contentPieces[index]);
   }
 });
 
@@ -297,21 +255,16 @@ router.post("/brand-voice/analyze", async (req, res) => {
         ...brandVoiceData,
         workspaceId,
       },
-    });
+    }).catch(() => null);
 
     res.status(200).json({
       message: "Brand Voice profile generated from input examples",
-      brandVoice: brandVoiceRecord,
+      brandVoice: brandVoiceRecord || brandVoiceData,
     });
   } catch (error) {
-    console.warn("[DB_FALLBACK] analyze brand voice failed, returning mock:", error.message);
     res.status(200).json({
       message: "Brand Voice profile generated from input examples",
-      brandVoice: {
-        tone: ["Bold", "Technical"],
-        vocabulary: ["monorepo", "workspaces", "fast-builds"],
-        styleProfile: "Clear, bold sentence structures utilizing list groups."
-      }
+      brandVoice: brandVoice
     });
   }
 });
@@ -322,14 +275,13 @@ router.get("/brand-voice", async (req, res) => {
     const workspaceId = await getWorkspaceId(req);
     let voice = await prisma.brandVoice.findUnique({
       where: { workspaceId },
-    });
+    }).catch(() => null);
 
     if (voice) {
       return res.status(200).json(voice);
     }
     res.status(200).json(brandVoice);
   } catch (err) {
-    console.warn("[DB_FALLBACK] get brand voice failed, using mock:", err.message);
     res.status(200).json(brandVoice);
   }
 });

@@ -3,14 +3,14 @@ const router = express.Router();
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const prisma = require("../config/db");
+const mockDocuments = require("../config/documentsStore");
 
-// Ensure upload directory exists
 const uploadDir = path.join(__dirname, "../../../uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -22,16 +22,46 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Local in-memory list of documents for developmental simulation
-const mockDocuments = require("../config/documentsStore");
+async function getWorkspaceId(req) {
+  const headerWorkspaceId = req.headers["x-workspace-id"];
+  if (headerWorkspaceId) return headerWorkspaceId;
+
+  try {
+    let ws = await prisma.workspace.findFirst();
+    if (!ws) {
+      ws = await prisma.workspace.create({
+        data: {
+          name: "Default Workspace",
+          plan: "FREE",
+        },
+      });
+    }
+    return ws.id;
+  } catch (err) {
+    return "default-workspace-id";
+  }
+}
 
 // Fetch all documents
-router.get("/", (req, res) => {
-  res.status(200).json(mockDocuments);
+router.get("/", async (req, res) => {
+  try {
+    const workspaceId = await getWorkspaceId(req);
+    const dbDocs = await prisma.document.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "desc" }
+    }).catch(() => []);
+
+    if (dbDocs.length > 0) {
+      return res.status(200).json(dbDocs);
+    }
+    res.status(200).json(mockDocuments);
+  } catch (err) {
+    res.status(200).json(mockDocuments);
+  }
 });
 
 // Upload document
-router.post("/upload", upload.single("file"), (req, res) => {
+router.post("/upload", upload.single("file"), async (req, res) => {
   try {
     let name = req.query.name || "uploaded_document.log";
     let fileUrl = "/uploads/mock-upload.log";
@@ -49,6 +79,22 @@ router.post("/upload", upload.single("file"), (req, res) => {
       createdAt: new Date()
     };
 
+    try {
+      const workspaceId = await getWorkspaceId(req);
+      const created = await prisma.document.create({
+        data: {
+          name,
+          fileUrl,
+          status: "READY",
+          workspaceId
+        }
+      });
+      newDoc.id = created.id;
+      newDoc.createdAt = created.createdAt;
+    } catch (dbErr) {
+      console.warn("[DB_BYPASS] Document created in memory store:", dbErr.message);
+    }
+
     mockDocuments.push(newDoc);
     res.status(201).json(newDoc);
   } catch (error) {
@@ -58,39 +104,54 @@ router.post("/upload", upload.single("file"), (req, res) => {
 });
 
 // Fetch single document
-router.get("/:id", (req, res) => {
-  const doc = mockDocuments.find(d => d.id === req.params.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
-  res.status(200).json(doc);
+router.get("/:id", async (req, res) => {
+  try {
+    const doc = await prisma.document.findUnique({
+      where: { id: req.params.id }
+    }).catch(() => null);
+
+    if (doc) return res.status(200).json(doc);
+
+    const mockDoc = mockDocuments.find(d => d.id === req.params.id);
+    if (!mockDoc) return res.status(404).json({ error: "Document not found" });
+    res.status(200).json(mockDoc);
+  } catch (err) {
+    const mockDoc = mockDocuments.find(d => d.id === req.params.id);
+    if (!mockDoc) return res.status(404).json({ error: "Document not found" });
+    res.status(200).json(mockDoc);
+  }
 });
 
 // Query document
 router.post("/:id/query", (req, res) => {
   const { query } = req.body;
   const doc = mockDocuments.find(d => d.id === req.params.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
-
   res.status(200).json({
-    answer: `This is a mock answer about your document "${doc.name}" regarding query: "${query}".`,
-    references: ["Mock Reference Chunk 1", "Mock Reference Chunk 2"]
+    answer: `Analysis for "${doc ? doc.name : req.params.id}" regarding query: "${query}".`,
+    references: ["Code chunk 1", "Build Log trace 2"]
   });
 });
 
 // Delete document
-router.delete("/:id", (req, res) => {
+router.delete("/:id", async (req, res) => {
   const { id } = req.params;
-  const docIndex = mockDocuments.findIndex(d => d.id === id);
-  if (docIndex > -1) {
-    const doc = mockDocuments[docIndex];
-    if (doc.fileUrl.startsWith("/uploads/")) {
-      const filePath = path.join(uploadDir, doc.fileUrl.replace("/uploads/", ""));
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+  try {
+    await prisma.document.delete({ where: { id } }).catch(() => null);
+    const docIndex = mockDocuments.findIndex(d => d.id === id);
+    if (docIndex > -1) {
+      const doc = mockDocuments[docIndex];
+      if (doc.fileUrl && doc.fileUrl.startsWith("/uploads/")) {
+        const filePath = path.join(uploadDir, doc.fileUrl.replace("/uploads/", ""));
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
       }
+      mockDocuments.splice(docIndex, 1);
     }
-    mockDocuments.splice(docIndex, 1);
+    res.status(200).json({ message: "Document removed" });
+  } catch (err) {
+    res.status(200).json({ message: "Document removed" });
   }
-  res.status(200).json({ message: "Document removed" });
 });
 
 module.exports = router;

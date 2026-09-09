@@ -10,6 +10,13 @@ Core Promise: **One platform. Six superpowers. Zero context-switching.**
 ---
 
 ## 🏗️ Architecture Layout
+b       -
+0+g
+
+
+
+
+
 
 ```
 [ Frontend: Next.js App Router ] ◄──(HTTPS REST / SSE Streams)──► [ Backend: Node.js + Express ]
@@ -21,6 +28,8 @@ Core Promise: **One platform. Six superpowers. Zero context-switching.**
 
 - **frontend/**: Next.js App Router workspace (Vanilla CSS, Zustand state management, lucide-react iconography).
 - **backend/**: Node.js + Express.js API server (real-time streaming API, BullMQ worker queues, Claude stream API integrations).
+
+   d-
 - **database/**: Prisma ORM schemas mapping all workspace, pipeline, and automation tables.
 
 ---

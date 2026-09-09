@@ -1,11 +1,33 @@
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
+}
+
+model Workspace {
+  id          String         @id @default(uuid())
+  name        String
+  logoUrl     String?        @map("logo_url")
+  plan        String         @default("FREE")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  users       User[]
+  contacts    Contact[]
+  companies   Company[]
+  workflows   Workflow[]
+  content     ContentPiece[]
+  brandVoice  BrandVoice?
+  integrations Integration[]
+  apiKeys     ApiKey[]
+  webhooks    Webhook[]
+  reports     Report[]
+  documents   Document[]
+
+  @@map("workspaces")
 }
 
 model User {
@@ -13,13 +35,17 @@ model User {
   email             String              @unique
   name              String?
   avatarUrl         String?             @map("avatar_url")
+  role              String              @default("ADMIN")
+  workspaceId       String?             @map("workspace_id")
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
-  
+
+  workspace         Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   authorizedAccounts AuthorizedAccount[]
   repositories      Repository[]
   chats             Chat[]
   queries           Query[]
+  notes             Note[]
 
   @@map("users")
 }
@@ -97,4 +123,184 @@ model Query {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("queries")
+}
+
+model ContentPiece {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  type        String    // "blog", "social", "email", "ad", "release_notes", "changelog"
+  title       String
+  body        String
+  status      String    @default("DRAFT") // "DRAFT", "PUBLISHED", "SCHEDULED"
+  scheduledAt DateTime? @map("scheduled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("content_pieces")
+}
+
+model BrandVoice {
+  id           String    @id @default(uuid())
+  workspaceId  String    @unique @map("workspace_id")
+  tone         Json      // string array
+  vocabulary   Json      // string array
+  styleProfile String    @map("style_profile")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("brand_voices")
+}
+
+model Contact {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  name        String
+  email       String
+  source      String?  // branch or lead source
+  stage       String   @default("DEV") // DEV, TESTING, STAGING, CANARY, PRODUCTION
+  score       Int      @default(85)   // health score
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notes       Note[]
+
+  @@map("contacts")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  contactId String   @map("contact_id")
+  content   String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+model Company {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  name        String
+  website     String?
+  industry    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("companies")
+}
+
+model Workflow {
+  id            String        @id @default(uuid())
+  workspaceId   String        @map("workspace_id")
+  name          String
+  triggerConfig String        @map("trigger_config") // JSON string
+  stepsJson     String        @map("steps_json")     // JSON string
+  status        String        @default("INACTIVE")   // ACTIVE or INACTIVE
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runs          WorkflowRun[]
+
+  @@map("workflows")
+}
+
+model WorkflowRun {
+  id          String    @id @default(uuid())
+  workflowId  String    @map("workflow_id")
+  status      String    @default("RUNNING") // RUNNING, COMPLETED, FAILED
+  startedAt   DateTime  @default(now()) @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  logJson     String    @map("log_json")     // JSON trace logs
+
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_runs")
+}
+
+model Integration {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  provider    String    // Slack, HubSpot, etc.
+  status      String    @default("INACTIVE") // ACTIVE, INACTIVE
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  syncLogs    SyncLog[]
+
+  @@map("integrations")
+}
+
+model SyncLog {
+  id            String      @id @default(uuid())
+  integrationId String      @map("integration_id")
+  status        String      // SUCCESS, FAILED
+  message       String
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("sync_logs")
+}
+
+model ApiKey {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  name        String
+  keyHash     String   @map("key_hash")
+  permissions Json     // string array
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model Webhook {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  type        String   @default("outbound")
+  url         String
+  events      Json     // string array
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  name        String
+  config      String   // JSON string
+  schedule    String?  // cron schedule or frequency
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  name        String
+  fileUrl     String   @map("file_url")
+  status      String   @default("READY")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
 }

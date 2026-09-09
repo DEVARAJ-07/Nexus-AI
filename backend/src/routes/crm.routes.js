@@ -53,7 +53,7 @@ async function seedDefaultRepositories(workspaceId) {
     { name: "nexus-frontend-client", email: "frontend@repo.nexus.ai", source: "dev", stage: "TESTING", score: 74, workspaceId },
     { name: "nexus-data-pipeline", email: "data@repo.nexus.ai", source: "hotfix/db-leak", stage: "DEV", score: 42, workspaceId }
   ];
-  await prisma.contact.createMany({ data: defaults });
+  await prisma.contact.createMany({ data: defaults }).catch(() => null);
 }
 
 // Map endpoints originally for CRM to support Pipeline visualizer
@@ -62,13 +62,13 @@ router.get("/contacts", async (req, res) => {
     const workspaceId = await getWorkspaceId(req);
     let contacts = await prisma.contact.findMany({
       where: { workspaceId },
-    });
+    }).catch(() => []);
 
     if (contacts.length === 0) {
       await seedDefaultRepositories(workspaceId);
       contacts = await prisma.contact.findMany({
         where: { workspaceId },
-      });
+      }).catch(() => []);
     }
 
     if (contacts.length > 0) {
@@ -76,7 +76,6 @@ router.get("/contacts", async (req, res) => {
     }
     res.status(200).json(repositories);
   } catch (err) {
-    console.warn("[DB_FALLBACK] get /contacts failed, using mock:", err.message);
     res.status(200).json(repositories);
   }
 });
@@ -102,13 +101,15 @@ router.post("/contacts", async (req, res) => {
         score: newRepo.health,
         workspaceId,
       },
-    });
-    newRepo.id = created.id;
-    newRepo.health = created.score;
+    }).catch(() => null);
+
+    if (created) {
+      newRepo.id = created.id;
+      newRepo.health = created.score;
+    }
     repositories.push(newRepo);
-    res.status(201).json(mapContactToRepository(created));
+    res.status(201).json(newRepo);
   } catch (err) {
-    console.warn("[DB_FALLBACK] post /contacts failed, using mock:", err.message);
     repositories.push(newRepo);
     res.status(201).json(newRepo);
   }
@@ -119,7 +120,7 @@ router.get("/contacts/:id", async (req, res) => {
   try {
     const contact = await prisma.contact.findUnique({
       where: { id },
-    });
+    }).catch(() => null);
     if (contact) {
       return res.status(200).json(mapContactToRepository(contact));
     }
@@ -127,7 +128,6 @@ router.get("/contacts/:id", async (req, res) => {
     if (!repo) return res.status(404).json({ error: "Repository not found" });
     res.status(200).json(repo);
   } catch (err) {
-    console.warn("[DB_FALLBACK] get /contacts/:id failed, using mock:", err.message);
     const repo = repositories.find(r => r.id === id);
     if (!repo) return res.status(404).json({ error: "Repository not found" });
     res.status(200).json(repo);
@@ -138,7 +138,7 @@ router.patch("/contacts/:id", async (req, res) => {
   const { id } = req.params;
   const { name, branch, stage, health } = req.body;
   try {
-    const c = await prisma.contact.findUnique({ where: { id } });
+    const c = await prisma.contact.findUnique({ where: { id } }).catch(() => null);
     if (c) {
       const updateData = {};
       if (name) updateData.name = name;
@@ -161,7 +161,6 @@ router.patch("/contacts/:id", async (req, res) => {
     repositories[index] = { ...repositories[index], ...req.body };
     res.status(200).json(repositories[index]);
   } catch (err) {
-    console.warn("[DB_FALLBACK] patch /contacts/:id failed, using mock:", err.message);
     const index = repositories.findIndex(r => r.id === id);
     if (index === -1) return res.status(404).json({ error: "Repository not found" });
     repositories[index] = { ...repositories[index], ...req.body };
@@ -172,63 +171,12 @@ router.patch("/contacts/:id", async (req, res) => {
 router.delete("/contacts/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const c = await prisma.contact.findUnique({ where: { id } });
-    if (c) {
-      await prisma.contact.delete({
-        where: { id },
-      });
-    }
+    await prisma.contact.delete({ where: { id } }).catch(() => null);
     repositories = repositories.filter(r => r.id !== id);
     res.status(200).json({ message: "Repository removed" });
   } catch (err) {
-    console.warn("[DB_FALLBACK] delete /contacts/:id failed, using mock:", err.message);
     repositories = repositories.filter(r => r.id !== id);
     res.status(200).json({ message: "Repository removed" });
-  }
-});
-
-router.post("/contacts/:id/notes", async (req, res) => {
-  const { id } = req.params;
-  const { content, createdBy } = req.body;
-  const newNote = {
-    id: `n-${Date.now()}`,
-    repoId: id,
-    content,
-    createdBy: createdBy || "System",
-    createdAt: new Date()
-  };
-  try {
-    const c = await prisma.contact.findUnique({ where: { id } });
-    if (c) {
-      let user = await prisma.user.findFirst();
-      if (!user) {
-        const workspaceId = await getWorkspaceId(req);
-        user = await prisma.user.create({
-          data: {
-            email: "system@nexus.ai",
-            name: createdBy || "System",
-            role: "ADMIN",
-            workspaceId,
-          },
-        });
-      }
-
-      const note = await prisma.note.create({
-        data: {
-          id: newNote.id,
-          contactId: id,
-          content,
-          createdBy: user.id,
-        },
-      });
-      newNote.id = note.id;
-    }
-    pipelineNotes.push(newNote);
-    res.status(201).json(newNote);
-  } catch (err) {
-    console.warn("[DB_FALLBACK] post note failed, using mock:", err.message);
-    pipelineNotes.push(newNote);
-    res.status(201).json(newNote);
   }
 });
 
@@ -236,7 +184,7 @@ router.patch("/contacts/:id/stage", async (req, res) => {
   const { id } = req.params;
   const { stage } = req.body;
   try {
-    const c = await prisma.contact.findUnique({ where: { id } });
+    const c = await prisma.contact.findUnique({ where: { id } }).catch(() => null);
     if (c) {
       const updated = await prisma.contact.update({
         where: { id },
@@ -252,7 +200,6 @@ router.patch("/contacts/:id/stage", async (req, res) => {
     repositories[index].stage = stage;
     res.status(200).json(repositories[index]);
   } catch (err) {
-    console.warn("[DB_FALLBACK] patch stage failed, using mock:", err.message);
     const index = repositories.findIndex(r => r.id === id);
     if (index === -1) return res.status(404).json({ error: "Repository not found" });
     repositories[index].stage = stage;
@@ -265,13 +212,13 @@ router.get("/pipeline", async (req, res) => {
     const workspaceId = await getWorkspaceId(req);
     let contacts = await prisma.contact.findMany({
       where: { workspaceId },
-    });
+    }).catch(() => []);
 
     if (contacts.length === 0) {
       await seedDefaultRepositories(workspaceId);
       contacts = await prisma.contact.findMany({
         where: { workspaceId },
-      });
+      }).catch(() => []);
     }
 
     if (contacts.length > 0) {
@@ -279,96 +226,7 @@ router.get("/pipeline", async (req, res) => {
     }
     res.status(200).json(repositories);
   } catch (err) {
-    console.warn("[DB_FALLBACK] get /pipeline failed, using mock:", err.message);
     res.status(200).json(repositories);
-  }
-});
-
-router.get("/companies", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    let companies = await prisma.company.findMany({
-      where: { workspaceId },
-    });
-
-    if (companies.length === 0) {
-      const defaultCompany = await prisma.company.create({
-        data: {
-          id: "cluster-1",
-          name: "Nexus Kubernetes Cluster",
-          website: "k8s.nexus.ai",
-          industry: "Technology",
-          workspaceId,
-        },
-      });
-      companies = [defaultCompany];
-    }
-
-    res.status(200).json(companies.map(c => ({
-      id: c.id,
-      name: c.name,
-      status: "HEALTHY",
-      nodesCount: 12,
-      pipelineValue: 100,
-    })));
-  } catch (err) {
-    console.warn("[DB_FALLBACK] get /companies failed, using mock:", err.message);
-    res.status(200).json([
-      { id: "cluster-1", name: "Nexus Kubernetes Cluster", status: "HEALTHY", nodesCount: 12, pipelineValue: 100 }
-    ]);
-  }
-});
-
-router.post("/import", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    const { repositories } = req.body;
-    let count = 0;
-
-    if (Array.isArray(repositories)) {
-      for (const repo of repositories) {
-        const existing = await prisma.contact.findFirst({
-          where: { name: repo.name, workspaceId },
-        });
-
-        if (existing) {
-          await prisma.contact.update({
-            where: { id: existing.id },
-            data: {
-              source: repo.branch || repo.source || "main",
-              stage: repo.stage || "DEV",
-              score: repo.health || repo.score || 85,
-            },
-          });
-        } else {
-          await prisma.contact.create({
-            data: {
-              name: repo.name,
-              email: `${repo.name.toLowerCase()}@repo.nexus.ai`,
-              source: repo.branch || repo.source || "main",
-              stage: repo.stage || "DEV",
-              score: repo.health || repo.score || 85,
-              workspaceId,
-            },
-          });
-        }
-        count++;
-      }
-    } else {
-      // Default seed behavior if no repository list is passed
-      const beforeCount = await prisma.contact.count({ where: { workspaceId } });
-      await seedDefaultRepositories(workspaceId);
-      const afterCount = await prisma.contact.count({ where: { workspaceId } });
-      count = afterCount - beforeCount;
-    }
-
-    res.status(200).json({
-      message: "Repositories imported successfully",
-      count,
-    });
-  } catch (error) {
-    console.error("Import error:", error);
-    res.status(500).json({ error: error.message });
   }
 });
 
@@ -377,7 +235,7 @@ router.get("/score-report", async (req, res) => {
     const workspaceId = await getWorkspaceId(req);
     const contacts = await prisma.contact.findMany({
       where: { workspaceId },
-    });
+    }).catch(() => []);
 
     if (contacts.length > 0) {
       const scores = contacts.map(c => c.score || 0);
@@ -408,7 +266,6 @@ router.get("/score-report", async (req, res) => {
       anomaliesCount: 1
     });
   } catch (err) {
-    console.warn("[DB_FALLBACK] get /score-report failed, using mock:", err.message);
     res.status(200).json({
       averageHealth: 88,
       distribution: { "0-20": 0, "21-40": 1, "41-60": 0, "61-80": 1, "81-100": 3 },

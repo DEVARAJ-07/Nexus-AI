@@ -18,120 +18,117 @@ router.get("/chat-stream", async (req, res) => {
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
+  res.setHeader("Connection-Empty-Action", "keep-alive");
 
   let fullResponseText = "";
+  let user = null;
+  let chat = null;
+  let chatHistory = [];
 
+  // Try DB persistence gracefully
   try {
-    // 1. Resolve User from Database
-    let user = await prisma.user.findFirst({
-      where: { name: username }
-    });
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: `${username}@github.com`,
-          name: username
-        }
-      });
-    }
+    const userEmail = `${username}@github.com`;
+    user = await prisma.user.upsert({
+      where: { email: userEmail },
+      update: { name: username },
+      create: { email: userEmail, name: username },
+    }).catch(() => null);
 
-    // 2. Resolve or Create Chat Session
-    let chat;
-    if (chatId) {
-      chat = await prisma.chat.findUnique({
-        where: { id: chatId }
-      });
-    }
-    if (!chat) {
-      chat = await prisma.chat.create({
-        data: {
-          userId: user.id,
-          title: message.substring(0, 40)
-        }
-      });
-    }
-
-    // 3. Load Chat History
-    const dbMessages = await prisma.message.findMany({
-      where: { chatId: chat.id },
-      orderBy: { createdAt: "asc" },
-      take: 10
-    });
-
-    const chatHistory = dbMessages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
-
-    // 4. Save User Message to Database
-    await prisma.message.create({
-      data: {
-        chatId: chat.id,
-        role: "user",
-        content: message
+    if (user) {
+      if (chatId) {
+        chat = await prisma.chat.findUnique({ where: { id: chatId } }).catch(() => null);
       }
-    });
+      if (!chat) {
+        chat = await prisma.chat.create({
+          data: {
+            userId: user.id,
+            title: message.substring(0, 40),
+          },
+        }).catch(() => null);
+      }
 
-    // 5. System prompt
-    const systemPrompt = `You are Nexus AI, an advanced developer pipeline intelligence engine.
+      if (chat) {
+        const dbMessages = await prisma.message.findMany({
+          where: { chatId: chat.id },
+          orderBy: { createdAt: "asc" },
+          take: 10,
+        }).catch(() => []);
+
+        chatHistory = dbMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
+        await prisma.message.create({
+          data: {
+            chatId: chat.id,
+            role: "user",
+            content: message,
+          },
+        }).catch(() => null);
+      }
+    }
+  } catch (dbErr) {
+    console.warn("[DB_BYPASS] Chat DB operation skipped:", dbErr.message);
+  }
+
+  const systemPrompt = `You are Nexus AI, an advanced developer pipeline intelligence engine.
 Your environment is fully connected to Supabase and GitHub.
-You are chatting with developer: @${username} (User ID: ${user.id}) in Chat Session: ${chat.title}.
+You are chatting with developer: @${username}.
 Analyze all diagnostic, code pipeline, and log questions directly and with code blocks.`;
 
-    const onToken = (token) => {
-      fullResponseText += token;
-      res.write(`data: ${JSON.stringify({ token, chatId: chat.id })}\n\n`);
-    };
+  const onToken = (token) => {
+    fullResponseText += token;
+    res.write(`data: ${JSON.stringify({ token, chatId: chat ? chat.id : "local-chat" })}\n\n`);
+  };
 
-    const onDone = async () => {
+  const onDone = async () => {
+    if (chat && user) {
       try {
-        // Save Assistant Message to Database
         await prisma.message.create({
           data: {
             chatId: chat.id,
             role: "assistant",
-            content: fullResponseText
-          }
-        });
+            content: fullResponseText,
+          },
+        }).catch(() => null);
 
-        // Save Log in Query Database
         await prisma.query.create({
           data: {
             userId: user.id,
             queryText: message.substring(0, 255),
             response: fullResponseText.substring(0, 1000),
-            status: "COMPLETED"
-          }
-        });
+            status: "COMPLETED",
+          },
+        }).catch(() => null);
       } catch (err) {
-        console.error("Failed to save stream response to DB:", err);
+        console.error("Failed to save stream response to DB:", err.message);
       }
-      res.write("data: [DONE]\n\n");
-      res.end();
-    };
+    }
+    res.write("data: [DONE]\n\n");
+    res.end();
+  };
 
-    const onError = async (err) => {
-      console.error("Stream emission failed, error:", err);
+  const onError = async (err) => {
+    console.error("Stream emission failed, error:", err.message);
+    if (user) {
       try {
         await prisma.query.create({
           data: {
             userId: user.id,
             queryText: message.substring(0, 255),
             response: err.message,
-            status: "FAILED"
-          }
-        });
-      } catch (dbErr) {
-        console.error(dbErr);
-      }
-      res.write(`data: ${JSON.stringify({ token: "\nError generating response." })}\n\n`);
-      res.write("data: [DONE]\n\n");
-      res.end();
-    };
+            status: "FAILED",
+          },
+        }).catch(() => null);
+      } catch (dbErr) {}
+    }
+    res.write(`data: ${JSON.stringify({ token: "\nError generating response." })}\n\n`);
+    res.write("data: [DONE]\n\n");
+    res.end();
+  };
 
-    // 6. Delegate stream invocation
+  try {
     if (model.startsWith("groq-")) {
       await groqService.generateChatStream(model, systemPrompt, message, chatHistory, onToken, onDone, onError);
     } else if (model.startsWith("ollama-")) {
@@ -141,9 +138,8 @@ Analyze all diagnostic, code pipeline, and log questions directly and with code 
     } else {
       await geminiService.generateChatStream(model, systemPrompt, message, chatHistory, onToken, onDone, onError);
     }
-
   } catch (error) {
-    console.error("Chat stream root error:", error);
+    console.error("Chat stream root error:", error.message);
     res.write(`data: ${JSON.stringify({ token: "\nError establishing connection." })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
@@ -183,7 +179,7 @@ router.post("/diagnose", async (req, res) => {
     
     res.status(200).json(diagnosis);
   } catch (error) {
-    console.error("AI Diagnostics route error:", error);
+    console.error("AI Diagnostics route error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -213,28 +209,9 @@ router.post("/research", async (req, res) => {
       citations: researchResult.citations,
     });
   } catch (error) {
-    console.error("Research API route error:", error);
+    console.error("AI Research route error:", error.message);
     res.status(500).json({ error: error.message });
   }
-});
-
-// Mock knowledge base endpoints for frontend safety
-router.get("/knowledge", async (req, res) => {
-  res.status(200).json([]);
-});
-router.post("/knowledge", async (req, res) => {
-  res.status(201).json({ id: "mock-kb", title: req.body.title });
-});
-router.delete("/knowledge/:id", async (req, res) => {
-  res.status(200).json({ message: "Knowledge item deleted" });
-});
-
-// Mock prompt template endpoints for frontend safety
-router.get("/prompts", async (req, res) => {
-  res.status(200).json([]);
-});
-router.post("/prompts", async (req, res) => {
-  res.status(201).json({ id: "mock-prompt", title: req.body.title });
 });
 
 module.exports = router;

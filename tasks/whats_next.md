@@ -21,7 +21,6 @@ To run the unified application with a live database:
 2. **Push DB Schema**: Run `npm run db:push` to sync the Prisma models with the PostgreSQL instance.
 3. **Launch Monorepo**: Run `npm run dev` to start both the Next.js frontend (port 3000) and Express.js API (port 5000) concurrently.
                   
----
 
 ## 📋 3. WHAT'S NEXT TO IMPLEMENT
 
@@ -54,6 +53,7 @@ Here is the exhaustive, end-to-end list of remaining feature implementations for
   - Connect score calculations to a Claude evaluator that reviews commit logs, branch activity, and test reports to compute health scores (1-100) and writes them to the DB.
 - [ ] **Activity Logs**:
   - Map pipeline drag events to insert events into `prisma.activity` and `prisma.note` tables.
+  jjgjgn  gjgfjghghgm   nb bjbnkng gjgg v ld n   n ggggg
 
 ### 📊 Module 4: Pipeline Analytics (Analytics Pulse)
 - [ ] **Analytics Event Tracking**:
@@ -69,7 +69,7 @@ Here is the exhaustive, end-to-end list of remaining feature implementations for
   - Initialize BullMQ workers in `backend/src/workers/` connecting to Redis.
   - Parse trigger configurations (e.g. `contact.created` or `contact.stage_changed`).
   - Implement condition evaluation logic (AND/OR field operators).
-  - Build action adapters: `SEND_EMAIL` (via Resend), `NOTIFY_SLACK` (via webhooks), `TRIGGER_DEPLOY` (via HTTP POST).
+  - Build action adapters: `SEND_EMAIL` (via Resend), `NOTIFY_SLACK` (via webhooks), `d` (via HTTP POST).
 
 ### 🔌 Module 6: DevOps Integrations (Connect Hub)
 - [ ] **OAuth Connection Flows**:
