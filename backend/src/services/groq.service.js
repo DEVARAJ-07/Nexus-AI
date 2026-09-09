@@ -1,6 +1,6 @@
 const env = require("../config/env");
 
-const isConfigured = env.GROQ_API_KEY && !env.GROQ_API_KEY.includes("placeholder");
+const isConfigured = env.GROQ_API_KEY && !env.GROQ_API_KEY.includes("placeholder") && env.GROQ_API_KEY.startsWith("gsk_");
 
 /**
  * Maps frontend model values to Groq model IDs
@@ -13,7 +13,6 @@ function getGroqModelId(modelName) {
   if (name.includes("8b") || name.includes("llama-3.1-8b")) {
     return "llama-3.1-8b-instant";
   }
-  // Default to stable Llama 3.3 70B
   return "llama-3.3-70b-versatile";
 }
 
@@ -28,7 +27,6 @@ async function generateChatStream(modelName, systemPrompt, userMessage, history 
   try {
     const groqModel = getGroqModelId(modelName);
 
-    // Format history for Groq (standard OpenAI message list)
     const messages = [
       { role: "system", content: systemPrompt },
       ...(history || []).map(h => ({
@@ -66,30 +64,26 @@ async function generateChatStream(modelName, systemPrompt, userMessage, history 
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
-      buffer = lines.pop(); // Keep the last incomplete line
+      buffer = lines.pop();
 
       for (const line of lines) {
         const cleanLine = line.trim();
         if (cleanLine.startsWith("data: ")) {
           const dataStr = cleanLine.substring(6).trim();
-          if (dataStr === "[DONE]") {
-            break;
-          }
+          if (dataStr === "[DONE]") break;
           try {
             const parsed = JSON.parse(dataStr);
             const token = parsed.choices?.[0]?.delta?.content;
             if (token) {
               onToken(token);
             }
-          } catch (e) {
-            // Skip parse errors on incomplete chunks
-          }
+          } catch (e) {}
         }
       }
     }
     onDone();
   } catch (error) {
-    console.error("Groq Chat Stream Error:", error);
+    console.error("Groq Chat Stream Error:", error.message);
     onError(error);
   }
 }
@@ -130,9 +124,7 @@ Return ONLY a JSON object matching this schema:
     "Running verification...",
     "Completing deployment..."
   ]
-}
-
-DO NOT wrap your response with markdown code blocks (e.g. do not write \`\`\`json). Return raw JSON only.`;
+}`;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -153,10 +145,11 @@ DO NOT wrap your response with markdown code blocks (e.g. do not write \`\`\`jso
     }
 
     const data = await response.json();
-    const text = data.choices[0].message.content.trim();
+    let text = data.choices[0].message.content.trim();
+    text = text.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
     return JSON.parse(text);
   } catch (error) {
-    console.error("Groq Diagnosis Error, falling back:", error);
+    console.error("Groq Diagnosis Error, falling back:", error.message);
     return getFallbackDiagnosis(logContent);
   }
 }
@@ -222,18 +215,17 @@ Return the output in this format:
 
     return { summary, citations };
   } catch (error) {
-    console.error("Groq Research Error:", error);
+    console.error("Groq Research Error:", error.message);
     return getFallbackResearch(topic, depth);
   }
 }
 
-// Fallback logic if key is missing
 function generateFallbackStream(message, onToken, onDone) {
   const fallbackTokens = [
     "Hello! ", "This ", "is ", "Nexus AI. ", "\n\n",
     "[Dev Mode: Fallback Groq Stream]\n",
     "I ", "detected ", "your ", "query: '", message, "'.\n\n",
-    "Please configure your GROQ_API_KEY in backend/.env to access live Llama 3.1 inference."
+    "Please configure your GROQ_API_KEY in backend/.env to access live Llama 3.3 inference."
   ];
   let i = 0;
   const interval = setInterval(() => {

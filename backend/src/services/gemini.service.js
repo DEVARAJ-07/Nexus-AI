@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const env = require("../config/env");
 
 let genAI = null;
-if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.includes("placeholder")) {
+if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.includes("placeholder") && env.GEMINI_API_KEY.startsWith("AIza")) {
   try {
     genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
   } catch (err) {
@@ -10,19 +10,21 @@ if (env.GEMINI_API_KEY && !env.GEMINI_API_KEY.includes("placeholder")) {
   }
 }
 
-
 function resolveGeminiModelId(modelName) {
   const name = (modelName || "").toLowerCase();
+  if (name.includes("2.0-flash") || name.includes("gemini-2.0-flash")) {
+    return "gemini-2.0-flash";
+  }
   if (name.includes("1.5-pro") || name.includes("gemini-1.5-pro")) {
-    return "gemini-pro-latest";
+    return "gemini-1.5-pro";
   }
   if (name.includes("1.5-flash") || name.includes("gemini-1.5-flash")) {
-    return "gemini-flash-latest";
+    return "gemini-1.5-flash";
   }
-  if (name.includes("gemini")) {
+  if (name.startsWith("gemini-")) {
     return name;
   }
-  return "gemini-pro-latest";
+  return "gemini-1.5-flash";
 }
 
 /**
@@ -40,7 +42,6 @@ async function generateChatStream(modelName, systemPrompt, userMessage, history 
       systemInstruction: systemPrompt,
     });
 
-    // Map history to Gemini format (role must be 'user' or 'model')
     const formattedHistory = (history || []).map(h => ({
       role: h.role === "assistant" || h.role === "model" ? "model" : "user",
       parts: [{ text: h.content }],
@@ -59,7 +60,7 @@ async function generateChatStream(modelName, systemPrompt, userMessage, history 
     }
     onDone();
   } catch (error) {
-    console.error("Gemini Chat Stream Error:", error);
+    console.error("Gemini Chat Stream Error:", error.message);
     onError(error);
   }
 }
@@ -74,7 +75,7 @@ async function diagnoseLog(logContent) {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-pro-latest",
+      model: "gemini-1.5-flash",
       generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -106,10 +107,11 @@ Return ONLY a JSON object matching this schema:
 }`;
 
     const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    let text = result.response.text().trim();
+    text = text.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
     return JSON.parse(text);
   } catch (error) {
-    console.error("Gemini Diagnosis Error, falling back:", error);
+    console.error("Gemini Diagnosis Error, falling back:", error.message);
     return getFallbackDiagnosis(logContent);
   }
 }
@@ -124,7 +126,7 @@ async function generateResearchSummary(topic, depth) {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
+      model: "gemini-1.5-flash",
     });
 
     const prompt = `Perform a technical research analysis on the topic: "${topic}".
@@ -146,7 +148,6 @@ Return the output in this format:
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     
-    // Parse summary and citations
     let summary = text;
     let citations = ["https://docs.nexus-ci.com/research", "https://wikipedia.org"];
     
@@ -161,7 +162,7 @@ Return the output in this format:
 
     return { summary, citations };
   } catch (error) {
-    console.error("Gemini Research Error:", error);
+    console.error("Gemini Research Error:", error.message);
     return getFallbackResearch(topic, depth);
   }
 }
@@ -175,11 +176,11 @@ async function getEmbedding(text) {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-2" });
+    const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
     const result = await model.embedContent(text);
     return result.embedding.values;
   } catch (error) {
-    console.error("Gemini Embedding Error, using fallback:", error);
+    console.error("Gemini Embedding Error, using fallback:", error.message);
     return getFallbackEmbedding(text);
   }
 }
@@ -194,13 +195,13 @@ async function generateText(systemPrompt, userPrompt) {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-pro-latest",
+      model: "gemini-1.5-flash",
       systemInstruction: systemPrompt
     });
     const result = await model.generateContent(userPrompt);
     return result.response.text();
   } catch (error) {
-    console.error("Gemini Generate Text Error:", error);
+    console.error("Gemini Generate Text Error:", error.message);
     throw error;
   }
 }
@@ -211,7 +212,7 @@ function generateFallbackStream(message, onToken, onDone) {
     "Hello! ", "This ", "is ", "Nexus AI. ", "\n\n",
     "[Dev Mode: Fallback Gemini Stream]\n",
     "I ", "detected ", "your ", "query: '", message, "'.\n\n",
-    "To use real Gemini Pro API, make sure your GEMINI_API_KEY env key is valid."
+    "To use live Gemini Pro API, make sure your GEMINI_API_KEY in backend/.env is valid."
   ];
   let i = 0;
   const interval = setInterval(() => {
@@ -274,7 +275,6 @@ function getFallbackResearch(topic, depth) {
 }
 
 function getFallbackEmbedding(text) {
-  // Generate a deterministic mock 768-dimension vector
   const vector = [];
   let sum = 0;
   for (let i = 0; i < text.length; i++) {
