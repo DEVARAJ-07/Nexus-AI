@@ -15,7 +15,9 @@ import {
   LayoutDashboard,
   Terminal as TerminalIcon,
   LogOut,
-  ChevronUp
+  ChevronUp,
+  Github,
+  ExternalLink
 } from "lucide-react";
 
 export default function Navbar() {
@@ -44,6 +46,8 @@ export default function Navbar() {
     { href: "/integrations", label: "INTEGRATIONS", icon: Network },
     { href: "/settings", label: "SETTINGS", icon: SettingsIcon },
   ];
+
+  const githubUrl = username && username !== "John Doe" ? `https://github.com/${username}` : "https://github.com/DEVARAJ-07";
 
   const handleLogout = () => {
     localStorage.setItem("nexus_auth", "false");
@@ -76,6 +80,25 @@ export default function Navbar() {
             </Link>
           );
         })}
+
+        <a
+          href={githubUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-item"
+          style={{
+            marginTop: "0.5rem",
+            border: "1px solid var(--border-color)",
+            backgroundColor: "var(--color-slate)",
+            color: "#ffffff",
+            boxShadow: "2px 2px 0px rgba(0,0,0,0.15)",
+            cursor: "pointer"
+          }}
+        >
+          <Github size={16} />
+          <span>ACCESS GITHUB</span>
+          <ExternalLink size={12} style={{ marginLeft: "auto", opacity: 0.8 }} />
+        </a>
       </nav>
 
       {/* User Profile Footer section */}
@@ -94,6 +117,34 @@ export default function Navbar() {
             display: "flex",
             flexDirection: "column"
           }}>
+            <a
+              href={githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                width: "100%",
+                textAlign: "left",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "monospace",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                padding: "0.6rem 0.8rem",
+                color: "var(--text-primary)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                borderBottom: "1px dotted var(--border-color)",
+                transition: "background 0.2s"
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = "var(--color-warm-grey)"}
+              onMouseLeave={(e) => e.target.style.backgroundColor = "transparent"}
+            >
+              <Github size={12} />
+              <span>MY GITHUB ACCOUNT</span>
+              <ExternalLink size={10} style={{ marginLeft: "auto" }} />
+            </a>
             <button
               onClick={handleLogout}
               style={{

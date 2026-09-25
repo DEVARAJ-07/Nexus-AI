@@ -248,7 +248,6 @@ export default function LandingPage() {
                 </label>
                 <input
                   type="email"
-                  placeholder="e.g. developer@nexus-ci.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -271,7 +270,6 @@ export default function LandingPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. John Doe"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   style={{
