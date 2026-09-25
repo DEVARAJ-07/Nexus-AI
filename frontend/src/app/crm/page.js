@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { FolderPlus, Play, X, ShieldAlert, Loader2, Activity } from "lucide-react";
-import { API_URL } from "../config";
 
 export default function CRM() {
   const [repositories, setRepositories] = useState([
@@ -32,7 +31,7 @@ export default function CRM() {
   useEffect(() => {
     async function loadRepos() {
       try {
-        const res = await fetch(`${API_URL}/api/crm/contacts`);
+        const res = await fetch("http://localhost:5000/api/crm/contacts");
         if (res.ok) {
           const data = await res.json();
           setRepositories(data);
@@ -56,7 +55,7 @@ export default function CRM() {
     );
 
     try {
-      await fetch(`${API_URL}/api/crm/contacts/${id}/stage`, {
+      await fetch(`http://localhost:5000/api/crm/contacts/${id}/stage`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: newStage })
@@ -83,7 +82,7 @@ export default function CRM() {
       // Sync new health scores back to backend
       for (const r of updatedList) {
         try {
-          await fetch(`${API_URL}/api/crm/contacts/${r.id}`, {
+          await fetch(`http://localhost:5000/api/crm/contacts/${r.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ health: r.health })
@@ -111,7 +110,7 @@ export default function CRM() {
     };
 
     try {
-      const res = await fetch(`${API_URL}/api/crm/contacts`, {
+      const res = await fetch("http://localhost:5000/api/crm/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
