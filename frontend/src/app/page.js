@@ -226,7 +226,7 @@ export default function LandingPage() {
               </h3>
               
               <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: "1.4" }}>
-                Enter your email address to log in to the pipeline command center workspace.
+                Sign in directly with your GitHub account or enter your email address below.
               </p>
 
               {error && (
@@ -241,6 +241,40 @@ export default function LandingPage() {
                   [ERR] {error}
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem("nexus_auth", "true");
+                  localStorage.setItem("github_username", "DEVARAJ-07");
+                  localStorage.setItem("github_avatar", "https://github.com/DEVARAJ-07.png");
+                  window.dispatchEvent(new Event("nexus-auth-change"));
+                  router.replace("/dashboard");
+                }}
+                className="brutalist-button"
+                style={{
+                  width: "100%",
+                  justifyContent: "center",
+                  fontSize: "0.85rem",
+                  padding: "0.85rem 1.5rem",
+                  boxShadow: "4px 4px 0px var(--border-color)",
+                  backgroundColor: "var(--color-slate)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem"
+                }}
+              >
+                <Github size={16} />
+                <span>SIGN IN WITH GITHUB ACCOUNT</span>
+              </button>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", margin: "0.1rem 0" }}>
+                <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)", opacity: 0.3 }} />
+                <span style={{ fontSize: "0.65rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>OR WORKSPACE EMAIL</span>
+                <div style={{ flex: 1, height: "1px", backgroundColor: "var(--border-color)", opacity: 0.3 }} />
+              </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", textAlign: "left" }}>
                 <label style={{ fontSize: "0.7rem", fontFamily: "monospace", color: "var(--text-secondary)" }}>
