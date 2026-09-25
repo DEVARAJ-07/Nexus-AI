@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Send, FileUp, Search, Trash2, Cpu, Check, Terminal, Play, Loader2, ShieldCheck, Activity, Code2 } from "lucide-react";
 import { API_URL } from "../config";
 
@@ -29,6 +29,17 @@ export default function Intelligence() {
 
   // Database documents list state
   const [dbDocuments, setDbDocuments] = useState([]);
+
+  // Auto-scroll ref
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isStreaming]);
 
   const mockLogs = {
     "log-1": {
@@ -398,13 +409,33 @@ index db838d9..e23df1f 100644
             </div>
           </div>
 
-          <div className="chat-messages" style={{ height: "480px", padding: "1.25rem", overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div 
+            className="chat-messages" 
+            style={{ 
+              height: "460px", 
+              padding: "1rem 1.25rem", 
+              overflowY: "auto", 
+              display: "flex", 
+              flexDirection: "column", 
+              gap: "0.75rem",
+              scrollbarWidth: "none",
+              msOverflowStyle: "none"
+            }}
+          >
             {messages.map((m, idx) => (
-              <div key={idx} className={`chat-bubble ${m.role}`} style={{ lineHeight: "1.5", fontSize: "0.85rem" }}>
-                <strong style={{ fontFamily: "monospace", letterSpacing: "0.04em" }}>{m.role === "user" ? "DEVELOPER" : "NEXUS_AI"}:</strong>
-                <div style={{ marginTop: "0.4rem", whiteSpace: "pre-wrap" }}>{m.content}</div>
+              <div 
+                key={idx} 
+                className={`chat-bubble ${m.role}`} 
+                style={{ 
+                  lineHeight: "1.45", 
+                  fontSize: "0.82rem",
+                  padding: "0.6rem 0.95rem"
+                }}
+              >
+                <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
 
           <form onSubmit={handleSend} style={{ display: "flex", gap: "12px" }}>
