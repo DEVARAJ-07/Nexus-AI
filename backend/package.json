@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "build": "node -e \"console.log('Backend ready')\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

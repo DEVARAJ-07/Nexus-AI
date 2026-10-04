@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const githubService = require('../services/github.service');
 const logParser = require('../services/logParser.service');
+const diagnosticService = require('../services/diagnostic.service');
 
 // Memory store for incident logs & deployment guard status
 const deploymentGuardStore = {
@@ -176,6 +177,63 @@ router.post('/push-nexus-branch', async (req, res) => {
     }
 
     return res.json({ success: true, result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/github/merge-pr
+ * Merge a pull request into base branch
+ */
+router.post('/merge-pr', async (req, res) => {
+  try {
+    const { owner = 'DEVARAJ-07', repo, prNumber, commitTitle } = req.body;
+    if (!repo || !prNumber) {
+      return res.status(400).json({ success: false, error: 'Repository name and PR number are required' });
+    }
+
+    const token = req.headers['x-github-token'];
+    const result = await githubService.mergePullRequest({
+      owner,
+      repo,
+      prNumber: parseInt(prNumber, 10),
+      commitTitle,
+      token
+    });
+
+    return res.json({ success: true, result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.response?.data?.message || err.message });
+  }
+});
+
+/**
+ * POST /api/github/diagnose
+ * Run comprehensive code diagnostics on a repository with animated Linux terminal steps
+ */
+router.post('/diagnose', async (req, res) => {
+  try {
+    const { owner = 'DEVARAJ-07', repo } = req.body;
+    if (!repo) {
+      return res.status(400).json({ success: false, error: 'Repository name required' });
+    }
+
+    const diagnosis = await diagnosticService.runDiagnostics(owner, repo);
+    return res.json(diagnosis);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/github/deployment-history
+ * Retrieve recent deployment and push history records
+ */
+router.get('/deployment-history', (req, res) => {
+  try {
+    const history = githubService.getDeploymentHistory();
+    return res.json({ success: true, history });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

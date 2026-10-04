@@ -65,7 +65,7 @@ export default function ClientAppShell({ children }) {
       <div className="main-area">
         <header className="topbar">
           <div className="topbar-title">Nexus AI Command Center</div>
-          <div className="topbar-meta">V.0.1</div>
+          <div className="topbar-meta">V1</div>
         </header>
         <main className="content-container">
           <TransitionProvider>{children}</TransitionProvider>

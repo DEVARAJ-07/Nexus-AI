@@ -1,252 +1,151 @@
-const express = require("express");
+/**
+ * Settings & Credentials Management Routes
+ * Configures GitHub PAT, AI API Keys (DeepSeek, OpenRouter, Groq, Gemini),
+ * and live web deployment gatekeeper rules.
+ */
+
+const express = require('express');
 const router = express.Router();
-const prisma = require("../config/db");
+const axios = require('axios');
 
-async function getWorkspaceId(req) {
-  const headerWorkspaceId = req.headers["x-workspace-id"];
-  if (headerWorkspaceId) return headerWorkspaceId;
-
-  try {
-    let ws = await prisma.workspace.findFirst();
-    if (!ws) {
-      ws = await prisma.workspace.create({
-        data: {
-          name: "Nexus Headquarters",
-          plan: "PRO",
-        },
-      });
-    }
-    return ws.id;
-  } catch (err) {
-    return "default-workspace-id";
-  }
+function maskKey(key) {
+  if (!key) return '';
+  return '••••••••' + key.slice(-4);
 }
 
-async function getUserId(req, workspaceId) {
+let settingsStore = {
+  githubToken: maskKey(process.env.GITHUB_TOKEN),
+  deepseekApiKey: maskKey(process.env.DEEPSEEK_API_KEY),
+  openrouterApiKey: maskKey(process.env.OPENROUTER_API_KEY),
+  groqApiKey: maskKey(process.env.GROQ_API_KEY),
+  geminiApiKey: maskKey(process.env.GEMINI_API_KEY),
+  deepseekModel: process.env.DEEPSEEK_MODEL || 'deepseek-coder',
+  autoBlockDeploymentOnFailure: true,
+  defaultBranchTarget: 'nexus',
+  webhookSecret: 'nexus_sec_' + Math.random().toString(36).substring(2, 10)
+};
+
+/**
+ * GET /api/settings
+ */
+router.get('/', (req, res) => {
+  return res.json({ success: true, settings: settingsStore });
+});
+
+/**
+ * POST /api/settings
+ */
+router.post('/', (req, res) => {
+  const {
+    githubToken,
+    deepseekApiKey,
+    openrouterApiKey,
+    groqApiKey,
+    geminiApiKey,
+    deepseekModel,
+    autoBlockDeploymentOnFailure,
+    defaultBranchTarget
+  } = req.body;
+
+  if (githubToken && !githubToken.includes('••••')) {
+    process.env.GITHUB_TOKEN = githubToken;
+    settingsStore.githubToken = maskKey(githubToken);
+  }
+
+  if (deepseekApiKey && !deepseekApiKey.includes('••••')) {
+    process.env.DEEPSEEK_API_KEY = deepseekApiKey;
+    settingsStore.deepseekApiKey = maskKey(deepseekApiKey);
+  }
+
+  if (openrouterApiKey && !openrouterApiKey.includes('••••')) {
+    process.env.OPENROUTER_API_KEY = openrouterApiKey;
+    settingsStore.openrouterApiKey = maskKey(openrouterApiKey);
+  }
+
+  if (groqApiKey && !groqApiKey.includes('••••')) {
+    process.env.GROQ_API_KEY = groqApiKey;
+    settingsStore.groqApiKey = maskKey(groqApiKey);
+  }
+
+  if (geminiApiKey && !geminiApiKey.includes('••••')) {
+    process.env.GEMINI_API_KEY = geminiApiKey;
+    settingsStore.geminiApiKey = maskKey(geminiApiKey);
+  }
+
+  if (deepseekModel) settingsStore.deepseekModel = deepseekModel;
+  if (typeof autoBlockDeploymentOnFailure === 'boolean') settingsStore.autoBlockDeploymentOnFailure = autoBlockDeploymentOnFailure;
+  if (defaultBranchTarget) settingsStore.defaultBranchTarget = defaultBranchTarget;
+
+  return res.json({ success: true, message: 'Settings saved successfully', settings: settingsStore });
+});
+
+/**
+ * POST /api/settings/test-github
+ */
+router.post('/test-github', async (req, res) => {
+  const token = req.body.token || process.env.GITHUB_TOKEN;
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'No GitHub token provided' });
+  }
+
   try {
-    let user = await prisma.user.findFirst({
-      where: { workspaceId },
+    const response = await axios.get('https://api.github.com/user', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': 'Nexus-AI-Agent'
+      }
     });
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: "DEVARAJ-07@github.com",
-          name: "DEVARAJ-07",
-          avatarUrl: "https://avatars.githubusercontent.com/u/211518264?v=4",
-          role: "ADMIN",
-          workspaceId,
-        },
-      });
-    }
-    return user.id;
+    return res.json({
+      success: true,
+      user: response.data.login,
+      message: `Successfully connected to GitHub as @${response.data.login}`
+    });
   } catch (err) {
-    return null;
-  }
-}
-
-router.get("/profile", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    const userId = await getUserId(req, workspaceId);
-
-    if (userId) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-      }).catch(() => null);
-
-      if (user) {
-        return res.status(200).json({
-          name: user.name || "DEVARAJ-07",
-          email: user.email || "DEVARAJ-07@github.com",
-          avatarUrl: user.avatarUrl || "https://avatars.githubusercontent.com/u/211518264?v=4",
-        });
-      }
-    }
-
-    res.status(200).json({
-      name: "DEVARAJ-07",
-      email: "DEVARAJ-07@github.com",
-      avatarUrl: "https://avatars.githubusercontent.com/u/211518264?v=4",
-    });
-  } catch (error) {
-    res.status(200).json({
-      name: "DEVARAJ-07",
-      email: "DEVARAJ-07@github.com",
-      avatarUrl: "https://avatars.githubusercontent.com/u/211518264?v=4",
+    return res.status(400).json({
+      success: false,
+      error: err.response?.data?.message || err.message
     });
   }
 });
 
-router.patch("/profile", async (req, res) => {
+/**
+ * POST /api/settings/test-deepseek
+ */
+router.post('/test-deepseek', async (req, res) => {
+  const apiKey = req.body.apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return res.status(400).json({ success: false, error: 'No DeepSeek or OpenRouter API key provided' });
+  }
+
   try {
-    const workspaceId = await getWorkspaceId(req);
-    const userId = await getUserId(req, workspaceId);
-    const { name, email, avatarUrl } = req.body;
-    
-    if (userId) {
-      const user = await prisma.user.update({
-        where: { id: userId },
-        data: {
-          name: name || undefined,
-          email: email || undefined,
-          avatarUrl: avatarUrl || undefined,
+    const endpoint = process.env.DEEPSEEK_API_KEY
+      ? 'https://api.deepseek.com/v1/chat/completions'
+      : 'https://openrouter.ai/api/v1/chat/completions';
+
+    const response = await axios.post(
+      endpoint,
+      {
+        model: process.env.DEEPSEEK_API_KEY ? 'deepseek-coder' : 'deepseek/deepseek-chat',
+        messages: [{ role: 'user', content: 'Ping test' }],
+        max_tokens: 5
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
         },
-      }).catch(() => null);
-
-      if (user) {
-        return res.status(200).json({
-          name: user.name,
-          email: user.email,
-          avatarUrl: user.avatarUrl || "https://avatars.githubusercontent.com/u/211518264?v=4",
-        });
+        timeout: 10000
       }
-    }
-    
-    res.status(200).json({
-      name: name || "DEVARAJ-07",
-      email: email || "DEVARAJ-07@github.com",
-      avatarUrl: avatarUrl || "https://avatars.githubusercontent.com/u/211518264?v=4",
+    );
+    return res.json({
+      success: true,
+      message: 'Successfully authenticated with AI Provider'
     });
-  } catch (error) {
-    res.status(200).json({
-      name: req.body.name || "DEVARAJ-07",
-      email: req.body.email || "DEVARAJ-07@github.com",
-      avatarUrl: req.body.avatarUrl || "https://avatars.githubusercontent.com/u/211518264?v=4",
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: err.response?.data?.error?.message || err.message
     });
-  }
-});
-
-router.get("/workspace", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    const ws = await prisma.workspace.findUnique({
-      where: { id: workspaceId },
-    }).catch(() => null);
-
-    res.status(200).json({
-      name: ws ? ws.name : "Nexus Headquarters",
-      logoUrl: ws ? ws.logoUrl : "",
-      plan: ws ? ws.plan : "PRO",
-    });
-  } catch (error) {
-    res.status(200).json({
-      name: "Nexus Headquarters",
-      logoUrl: "",
-      plan: "PRO",
-    });
-  }
-});
-
-router.patch("/workspace", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    const { name, logoUrl } = req.body;
-    
-    const ws = await prisma.workspace.update({
-      where: { id: workspaceId },
-      data: {
-        name: name || undefined,
-        logoUrl: logoUrl || undefined,
-      },
-    }).catch(() => null);
-    
-    res.status(200).json({
-      name: ws ? ws.name : (name || "Nexus Headquarters"),
-      logoUrl: ws ? ws.logoUrl : (logoUrl || ""),
-      plan: ws ? ws.plan : "PRO",
-    });
-  } catch (error) {
-    res.status(200).json({
-      name: req.body.name || "Nexus Headquarters",
-      logoUrl: req.body.logoUrl || "",
-      plan: "PRO",
-    });
-  }
-});
-
-router.get("/team", async (req, res) => {
-  try {
-    const workspaceId = await getWorkspaceId(req);
-    const users = await prisma.user.findMany({
-      where: { workspaceId },
-    }).catch(() => []);
-
-    if (users.length > 0) {
-      return res.status(200).json(users.map(u => ({
-        id: u.id,
-        name: u.name || u.email.split("@")[0],
-        email: u.email,
-        role: u.role || "MEMBER",
-      })));
-    }
-
-    res.status(200).json([
-      { id: "u-1", name: "DEVARAJ-07", email: "DEVARAJ-07@github.com", role: "ADMIN" },
-      { id: "u-2", name: "Sarah Connor", email: "sarah@skynet.com", role: "MEMBER" }
-    ]);
-  } catch (error) {
-    res.status(200).json([
-      { id: "u-1", name: "DEVARAJ-07", email: "DEVARAJ-07@github.com", role: "ADMIN" },
-      { id: "u-2", name: "Sarah Connor", email: "sarah@skynet.com", role: "MEMBER" }
-    ]);
-  }
-});
-
-router.post("/team/invite", async (req, res) => {
-  try {
-    const { email, role } = req.body;
-    const workspaceId = await getWorkspaceId(req);
-    
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-    
-    const newMember = await prisma.user.create({
-      data: {
-        email,
-        name: email.split("@")[0],
-        role: role || "MEMBER",
-        workspaceId,
-      },
-    }).catch(() => ({
-      id: `u-${Date.now()}`,
-      name: email.split("@")[0],
-      email,
-      role: role || "MEMBER"
-    }));
-    
-    res.status(201).json({
-      message: "Invite dispatched successfully",
-      member: {
-        id: newMember.id,
-        name: newMember.name,
-        email: newMember.email,
-        role: newMember.role,
-      },
-    });
-  } catch (error) {
-    res.status(201).json({
-      message: "Invite dispatched successfully",
-      member: {
-        id: `u-${Date.now()}`,
-        name: req.body.email ? req.body.email.split("@")[0] : "Member",
-        email: req.body.email,
-        role: req.body.role || "MEMBER",
-      },
-    });
-  }
-});
-
-router.delete("/team/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-    await prisma.user.delete({
-      where: { id: userId },
-    }).catch(() => null);
-    
-    res.status(200).json({ message: "Team member access revoked" });
-  } catch (error) {
-    res.status(200).json({ message: "Team member access revoked" });
   }
 });
 
