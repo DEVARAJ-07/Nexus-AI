@@ -14,52 +14,41 @@ app.use((req, res, next) => {
   next();
 });
 
-// Root check endpoint
+// Root API Health Endpoint
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "ACTIVE",
-    service: "Nexus AI Backend API",
-    frontendUrl: "http://localhost:3000",
+    service: "Nexus AI - GitHub CI/CD & Log AI Rectifier Engine",
+    version: "2.0.0",
     endpoints: {
       health: "/health",
-      auth: "/api/auth",
+      github: "/api/github",
       ai: "/api/ai",
-      crm: "/api/crm"
+      settings: "/api/settings"
     }
   });
 });
 
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
+  res.status(200).json({ status: "OK", service: "Nexus AI Engine", timestamp: new Date().toISOString() });
 });
 
-// Import route modules
-const authRoutes = require("./routes/auth.routes");
+// Import Nexus AI routes
+const githubRoutes = require("./routes/github.routes");
 const aiRoutes = require("./routes/ai.routes");
-const documentsRoutes = require("./routes/documents.routes");
-const contentRoutes = require("./routes/content.routes");
-const crmRoutes = require("./routes/crm.routes");
-const analyticsRoutes = require("./routes/analytics.routes");
-const automationRoutes = require("./routes/automation.routes");
-const integrationsRoutes = require("./routes/integrations.routes");
 const settingsRoutes = require("./routes/settings.routes");
 
-// Map API endpoints
-app.use("/api/auth", authRoutes);
+// Register API routes
+app.use("/api/github", githubRoutes);
 app.use("/api/ai", aiRoutes);
-app.use("/api/documents", documentsRoutes);
-app.use("/api/content", contentRoutes);
-app.use("/api/crm", crmRoutes);
-app.use("/api/analytics", analyticsRoutes);
-app.use("/api/automation", automationRoutes);
-app.use("/api/integrations", integrationsRoutes);
 app.use("/api/settings", settingsRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error("Unhandled Error:", err);
+  console.error("Unhandled Backend Error:", err);
   res.status(err.status || 500).json({
-    error: err.message || "Internal Server Error",
+    success: false,
+    error: err.message || "Internal Server Error"
   });
 });
 

@@ -4,50 +4,39 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Home,
-  Brain,
-  FileText,
-  Target,
-  BarChart4,
-  Cpu,
-  Network,
-  Settings as SettingsIcon,
   LayoutDashboard,
+  Brain,
+  Target,
+  Network,
   Terminal as TerminalIcon,
   LogOut,
-  ChevronUp,
-  Github,
-  ExternalLink
+  ChevronUp
 } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [username, setUsername] = useState("John Doe");
-  const [avatar, setAvatar] = useState("");
+  const [username, setUsername] = useState("DEVARAJ-07");
+  const [avatar, setAvatar] = useState("/avatar.png");
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const storedUser = localStorage.getItem("github_username");
       const storedAvatar = localStorage.getItem("github_avatar");
       if (storedUser) setUsername(storedUser);
-      if (storedAvatar) setAvatar(storedAvatar);
+      if (storedAvatar && storedAvatar.startsWith("/")) setAvatar(storedAvatar);
     }
   }, []);
 
   const navItems = [
     { href: "/dashboard", label: "DASHBOARD", icon: LayoutDashboard },
     { href: "/intelligence", label: "LOG INTELLIGENCE", icon: Brain },
-    { href: "/content", label: "RELEASE STUDIO", icon: FileText },
     { href: "/crm", label: "PIPELINES & REPOS", icon: Target },
-    { href: "/analytics", label: "PIPELINE ANALYTICS", icon: BarChart4 },
-    { href: "/automation", label: "DEVOPS AUTOMATION", icon: Cpu },
     { href: "/integrations", label: "INTEGRATIONS", icon: Network },
-    { href: "/settings", label: "SETTINGS", icon: SettingsIcon },
   ];
 
-  const githubUrl = username && username !== "John Doe" ? `https://github.com/${username}` : "https://github.com/DEVARAJ-07";
+  const githubUrl = `https://github.com/${username}`;
 
   const handleLogout = () => {
     localStorage.setItem("nexus_auth", "false");
@@ -80,28 +69,9 @@ export default function Navbar() {
             </Link>
           );
         })}
-
-        <a
-          href={githubUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="nav-item"
-          style={{
-            marginTop: "0.5rem",
-            border: "1px solid var(--border-color)",
-            backgroundColor: "var(--color-slate)",
-            color: "#ffffff",
-            boxShadow: "2px 2px 0px rgba(0,0,0,0.15)",
-            cursor: "pointer"
-          }}
-        >
-          <Github size={16} />
-          <span>ACCESS GITHUB</span>
-          <ExternalLink size={12} style={{ marginLeft: "auto", opacity: 0.8 }} />
-        </a>
       </nav>
 
-      {/* User Profile Footer section */}
+      {/* User Profile Footer section with Real Avatar */}
       <div style={{ position: "relative", marginTop: "auto", borderTop: "1px solid var(--border-color)", paddingTop: "1rem" }}>
         {showProfileMenu && (
           <div style={{
@@ -117,34 +87,6 @@ export default function Navbar() {
             display: "flex",
             flexDirection: "column"
           }}>
-            <a
-              href={githubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                width: "100%",
-                textAlign: "left",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "monospace",
-                fontSize: "0.75rem",
-                fontWeight: 700,
-                padding: "0.6rem 0.8rem",
-                color: "var(--text-primary)",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                borderBottom: "1px dotted var(--border-color)",
-                transition: "background 0.2s"
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = "var(--color-warm-grey)"}
-              onMouseLeave={(e) => e.target.style.backgroundColor = "transparent"}
-            >
-              <Github size={12} />
-              <span>MY GITHUB ACCOUNT</span>
-              <ExternalLink size={10} style={{ marginLeft: "auto" }} />
-            </a>
             <button
               onClick={handleLogout}
               style={{
@@ -189,14 +131,13 @@ export default function Navbar() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <img 
-              src={avatar || "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"} 
-              onError={(e) => { e.target.src = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"; }}
-              style={{ width: "26px", height: "26px", borderRadius: "50%", border: "1px solid var(--border-color)" }}
-              alt="User Avatar"
+              src="/avatar.png" 
+              onError={(e) => { e.target.src = "/avatar.png"; }}
+              style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid var(--border-color)", objectFit: "cover" }}
+              alt="DEVARAJ S"
             />
             <div style={{ display: "flex", flexDirection: "column", maxWidth: "120px" }}>
               <span style={{ fontSize: "0.75rem", fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{username}</span>
-              <span style={{ fontSize: "0.55rem", color: "var(--text-secondary)", fontFamily: "monospace" }}>DEVELOPER</span>
             </div>
           </div>
           <ChevronUp size={14} style={{ color: "var(--text-secondary)", transform: showProfileMenu ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
